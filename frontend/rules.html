@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Decision Rules Management
+  Admin portal for creating, updating, activating/deactivating agricultural harvest advice rules.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Decision Rules</title>
+  <script src="js/sidebar.js"></script>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    /* Modal Dialog Styles */
+    dialog.modal-dialog {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      max-width: 540px;
+      width: 90%;
+      margin: auto;
+      background-color: var(--color-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    dialog.modal-dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-header {
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .modal-title {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-top: var(--space-6);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    /* Small action buttons in table */
+    .btn-sm {
+      min-height: 32px;
+      min-width: 32px;
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--font-xs);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background-color: var(--color-surface-hover);
+      border-color: var(--color-border-hover);
+    }
+
+    .badge-inactive {
+      background-color: var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    /* Table container for responsive horizontal scrolling */
+    .table-container {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+      min-width: 820px;
+      white-space: nowrap;
+    }
+
+    .field-error {
+      color: var(--color-danger);
+      font-size: var(--font-xs);
+      margin-top: var(--space-1);
+    }
+
+    .input-error {
+      border-color: var(--color-danger) !important;
+    }
+
+    .field-hint {
+      color: var(--color-text-muted);
+      font-size: var(--font-xs);
+      margin-top: var(--space-1);
+      line-height: 1.4;
+    }
+
+    .safety-warning {
+      color: var(--color-warning-text);
+      background-color: var(--color-warning-bg);
+      border: 1px solid var(--color-warning-border);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-xs);
+      margin-top: var(--space-2);
+      line-height: 1.4;
+    }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: var(--font-sm);
+      user-select: none;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-height: 18px;
+      cursor: pointer;
+    }
+
+    .conditions-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      white-space: normal;
+      min-width: 240px;
+    }
+
+    .conditions-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .condition-meta {
+      font-size: var(--font-xs);
+      color: var(--color-text-muted);
+    }
+
+    .pill-sm {
+      font-size: 11px;
+      padding: 2px 6px;
+      font-weight: 600;
+      border-radius: var(--radius-full);
+      text-transform: capitalize;
+    }
+  </style>
+</head>
+<body class="fixed-pills">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 style="color: var(--color-primary); font-size: var(--font-xl);">METLINK</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link">Dashboard</a>
+        <a href="farmers.html" class="sidebar-link">Farmers</a>
+        <a href="markets.html" class="sidebar-link">Markets</a>
+        <a href="seasons.html" class="sidebar-link">Seasons</a>
+        <a href="rules.html" class="sidebar-link active">Rules</a>
+        <a href="logs.html" class="sidebar-link">Logs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="btn btn-secondary w-full" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <span style="font-weight: 600;">Admin Dashboard</span>
+        <span id="adminName" class="badge badge-primary"></span>
+      </header>
+
+      <main class="main-content">
+        <!-- Global Feedback Banners -->
+        <div id="feedbackContainer" style="margin-bottom: var(--space-4);">
+          <div id="alertSuccess" class="alert alert-success" role="status" aria-live="polite" style="display: none;">
+            <span id="alertSuccessText"></span>
+          </div>
+          <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
+            <span id="alertErrorText"></span>
+            <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Decision Rules</h1>
+            <p class="page-subtitle">Rules are checked in priority order. Lowest number runs first.</p>
+          </div>
+          <button id="openRuleModalBtn" class="btn btn-primary" type="button">
+            + Create Rule
+          </button>
+        </div>
+
+        <!-- Summary Strip -->
+        <div class="grid grid-cols-3" style="margin-bottom: var(--space-6);">
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Total Rules</span>
+            <div id="totalCount" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1);">0</div>
+          </div>
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Active Rules</span>
+            <div id="activeCount" style="font-size: var(--font-2xl); font-weight: 700; color: var(--color-secondary); margin-top: var(--space-1);">0</div>
+          </div>
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Inactive Rules</span>
+            <div id="inactiveCount" style="font-size: var(--font-2xl); font-weight: 700; color: var(--color-text-muted); margin-top: var(--space-1);">0</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3" style="flex: 1; min-width: 260px;">
+              <div style="flex: 1; min-width: 180px;">
+                <input 
+                  type="text" 
+                  id="searchInput" 
+                  placeholder="Search by rule name..." 
+                  aria-label="Search rules by name"
+                >
+              </div>
+              <div style="width: 140px;">
+                <select id="statusFilter" aria-label="Filter by status">
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div style="width: 180px;">
+                <select id="actionFilter" aria-label="Filter by advised action">
+                  <option value="all">All Actions</option>
+                  <option value="SELL_NOW">Sell Now</option>
+                  <option value="STORE_AND_WAIT">Store and Wait</option>
+                  <option value="SEEK_ALTERNATIVE_MARKET">Seek Alternative Market</option>
+                </select>
+              </div>
+            </div>
+            <div id="showingCountText" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+              Showing 0 of 0 rules
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Rules Table Card -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <!-- Loading State -->
+          <div id="tableLoading" class="text-center" style="padding: var(--space-8); display: none;">
+            <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+            <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading decision rules...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div id="tableEmpty" class="text-center" style="padding: var(--space-8); display: none;">
+            <p id="emptyMessage" class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No decision rules registered yet.</p>
+          </div>
+
+          <!-- Table Container -->
+          <div id="tableWrapper" class="table-container">
+            <table class="table" id="rulesTable">
+              <thead>
+                <tr>
+                  <th scope="col" style="width: 80px;" data-sort="priority" title="Sort column" tabindex="0" aria-sort="none">Priority</th>
+                  <th scope="col" data-sort="rule_name" title="Sort column" tabindex="0" aria-sort="none">Rule Name</th>
+                  <th scope="col" style="min-width: 330px;">Conditions</th>
+                  <th scope="col" style="min-width: 220px;">Result</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rulesTableBody">
+                <!-- Dynamically populated via rules.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Decision Support Disclaimer -->
+        <footer style="margin-top: var(--space-8); text-align: center; font-size: var(--font-xs); color: var(--color-text-muted);">
+          <p style="margin-bottom: 0;">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</p>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- Shared Rule Modal Dialog (Create & Edit) -->
+  <dialog id="ruleModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title" id="ruleModalTitle">Create Decision Rule</h2>
+    </div>
+
+    <div id="ruleModalError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-3);"></div>
+
+    <form id="ruleForm" novalidate>
+      <input type="hidden" id="ruleId">
+
+      <div class="form-group">
+        <label for="ruleName">Rule name <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="ruleName" 
+          name="rule_name" 
+          required 
+          placeholder="e.g. Green Storage for Price Rise" 
+          autocomplete="off"
+        >
+        <div id="ruleNameError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="grid grid-cols-3" style="gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="maturitySelect">Maturity <span style="color: var(--color-danger);">*</span></label>
+          <select id="maturitySelect" name="maturity" required>
+            <option value="GREEN">Green</option>
+            <option value="TURNING">Turning</option>
+            <option value="RIPE" selected>Ripe</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="priceTrendSelect">Price Trend <span style="color: var(--color-danger);">*</span></label>
+          <select id="priceTrendSelect" name="price_trend" required>
+            <option value="RISING">Rising</option>
+            <option value="STABLE" selected>Stable</option>
+            <option value="FALLING">Falling</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="demandLevelSelect">Demand Level <span style="color: var(--color-danger);">*</span></label>
+          <select id="demandLevelSelect" name="demand_level" required>
+            <option value="HIGH" selected>High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: var(--space-4);">
+        <label class="checkbox-label" for="preservationCheckbox">
+          <input type="checkbox" id="preservationCheckbox" name="preservation_required">
+          <span>Preservation required</span>
+        </label>
+        <div class="field-hint">
+          Tick this only if the farmer can store tomatoes safely (cool, ventilated or processed).
+        </div>
+        <div id="preservationSafetyNote" class="safety-warning" style="display: none;"></div>
+      </div>
+
+      <div class="grid grid-cols-2" style="gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="actionSelect">Advised Action <span style="color: var(--color-danger);">*</span></label>
+          <select id="actionSelect" name="action" required>
+            <option value="SELL_NOW" selected>Sell now</option>
+            <option value="STORE_AND_WAIT">Store and wait</option>
+            <option value="SEEK_ALTERNATIVE_MARKET">Seek alternative market</option>
+          </select>
+          <div id="actionError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="waitingPeriodInput">Waiting period (days)</label>
+          <input 
+            type="number" 
+            id="waitingPeriodInput" 
+            name="waiting_period_days" 
+            min="1" 
+            step="1" 
+            placeholder="e.g. 7" 
+            disabled
+          >
+          <div id="waitingPeriodError" class="field-error" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2" style="gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="minQuantityInput">Min quantity (kg)</label>
+          <input 
+            type="number" 
+            id="minQuantityInput" 
+            name="min_quantity_kg" 
+            min="1" 
+            step="any" 
+            placeholder="e.g. 200 (optional)"
+          >
+          <div id="minQuantityError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="priorityInput">Priority <span style="color: var(--color-danger);">*</span></label>
+          <input 
+            type="number" 
+            id="priorityInput" 
+            name="priority" 
+            min="1" 
+            step="1" 
+            value="1" 
+            required 
+            placeholder="1"
+          >
+          <div class="field-hint">Lowest number runs first (1 is top priority).</div>
+          <div id="priorityError" class="field-error" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="modalCancelBtn" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="modalSubmitBtn" class="btn btn-primary">Create Rule</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/rules.js"></script>
+</body>
+</html>

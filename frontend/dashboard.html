@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Admin Dashboard Home
+  Executive decision-support dashboard, quick actions, live KPI overview, and account management.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Dashboard</title>
+  <script src="js/sidebar.js"></script>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body class="fixed-pills">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 style="color: var(--color-primary); font-size: var(--font-xl);">METLINK</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link active">Dashboard</a>
+        <a href="farmers.html" class="sidebar-link">Farmers</a>
+        <a href="markets.html" class="sidebar-link">Markets</a>
+        <a href="seasons.html" class="sidebar-link">Seasons</a>
+        <a href="rules.html" class="sidebar-link">Rules</a>
+        <a href="logs.html" class="sidebar-link">Logs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="btn btn-secondary w-full" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <span style="font-weight: 600;">Admin Dashboard</span>
+        <span id="adminName" class="badge badge-primary"></span>
+      </header>
+
+      <main class="main-content">
+        <!-- Global Feedback Banners -->
+        <div id="feedbackContainer" style="margin-bottom: var(--space-4);">
+          <div id="alertSuccess" class="alert alert-success" role="status" aria-live="polite" style="display: none;">
+            <span id="alertSuccessText"></span>
+          </div>
+          <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
+            <span id="alertErrorText"></span>
+            <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- 1. Hero Card -->
+        <div class="card home-hero">
+          <div class="home-hero-content">
+            <h1 class="home-hero-title">Welcome back, <span id="heroFullName">Administrator</span></h1>
+            <p class="home-hero-mission">Helping Kamonyi tomato farmers reduce post-harvest losses with USSD harvest submissions and SMS market intelligence.</p>
+            <div class="home-hero-profile">
+              <span><strong>User:</strong> <span id="heroUsername">-</span></span>
+              <span>&bull;</span>
+              <span><strong>Email:</strong> <span id="heroEmail">-</span></span>
+              <span>&bull;</span>
+              <span id="heroRoleBadge" class="badge badge-slate pill-w-sm">ADMIN</span>
+            </div>
+          </div>
+          <!-- Tomato Harvest Photo -->
+          <div class="home-hero-illus" aria-hidden="true">
+            <img src="images/tomato-harvest.jpg" alt="Fresh ripe red tomatoes" width="140" height="110" style="width: 140px; height: 110px; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);">
+          </div>
+        </div>
+
+        <!-- 2. Quick Action Row of Glass Cards -->
+        <section class="home-glass-section" aria-label="Quick management actions">
+          <div class="home-glass-grid">
+            <a href="farmers.html" class="home-glass">
+              <div class="home-glass-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Farmers</span>
+              </div>
+              <p class="home-glass-desc">Register and manage tomato growers across Kamonyi sectors.</p>
+            </a>
+
+            <a href="markets.html" class="home-glass">
+              <div class="home-glass-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Market Prices</span>
+              </div>
+              <p class="home-glass-desc">Update Kigali & local market prices and wholesale demand trends.</p>
+            </a>
+
+            <a href="seasons.html" class="home-glass">
+              <div class="home-glass-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>Seasons</span>
+              </div>
+              <p class="home-glass-desc">Configure Rwandan Season A, B, and C agricultural periods.</p>
+            </a>
+
+            <a href="rules.html" class="home-glass">
+              <div class="home-glass-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                <span>Rules</span>
+              </div>
+              <p class="home-glass-desc">Calibrate harvest decision logic and preservation requirements.</p>
+            </a>
+
+            <a href="logs.html" class="home-glass">
+              <div class="home-glass-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Logs</span>
+              </div>
+              <p class="home-glass-desc">Inspect farmer harvest submissions, SMS delivery, and audit history.</p>
+            </a>
+          </div>
+        </section>
+
+        <!-- 3. Role and Policy Card -->
+        <div class="card home-policy-card">
+          <p style="margin: 0; font-size: var(--font-sm); color: var(--color-text-muted); line-height: 1.5;">
+            <strong>Administrator Responsibilities:</strong> Register farmers, keep market prices, seasons and rules accurate, and review audit logs promptly.
+            <span style="display: block; margin-top: 4px; font-weight: 600; color: var(--color-text);">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</span>
+          </p>
+        </div>
+
+        <!-- 4. Live Overview Section -->
+        <div class="page-header" style="margin-bottom: var(--space-4);">
+          <div>
+            <h2 class="page-title" style="font-size: var(--font-xl);">System Overview</h2>
+            <p class="page-subtitle">Real-time metrics from harvest submissions, dispatch notifications, and administrator actions.</p>
+          </div>
+          <button id="refreshOverviewBtn" class="btn btn-outline" type="button" aria-label="Refresh overview data">
+            &#x21bb; Refresh
+          </button>
+        </div>
+
+        <!-- Overview Loading Spinner -->
+        <div id="overviewLoading" class="text-center" style="padding: var(--space-8); display: none;">
+          <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+          <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading system metrics...</p>
+        </div>
+
+        <!-- Overview Error Banner -->
+        <div id="overviewError" class="alert alert-error" style="display: none; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
+          <span id="overviewErrorText">Failed to load system metrics.</span>
+          <button type="button" id="retryOverviewBtn" class="btn btn-outline btn-sm" style="background-color: #ffffff;">Retry</button>
+        </div>
+
+        <!-- Overview Content: 5 KPI Cards + Active Season Highlight Card -->
+        <div id="overviewContent" style="display: none;">
+          <div class="grid grid-cols-3" style="margin-bottom: var(--space-6);">
+            <!-- KPI 1 -->
+            <div class="card">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Active Farmers</span>
+              <div id="kpiActiveFarmers" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1); color: var(--color-success-text);">0</div>
+            </div>
+
+            <!-- KPI 2 -->
+            <div class="card">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Total Submissions</span>
+              <div id="kpiTotalSubmissions" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1);">0</div>
+            </div>
+
+            <!-- KPI 3 -->
+            <div class="card">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Pending Submissions</span>
+              <div id="kpiPendingSubmissions" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1); color: var(--color-pill-amber);">0</div>
+            </div>
+
+            <!-- KPI 4 -->
+            <div class="card">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Delivered SMS</span>
+              <div id="kpiDeliveredSms" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1); color: var(--color-success-text);">0</div>
+            </div>
+
+            <!-- KPI 5 -->
+            <div class="card">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Total SMS Dispatched</span>
+              <div id="kpiTotalSms" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1);">0</div>
+            </div>
+
+            <!-- Active Season Card -->
+            <div class="card home-season-card" style="margin-bottom: 0;">
+              <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Active Agricultural Season</span>
+              <div id="activeSeasonName" style="font-size: var(--font-lg); font-weight: 700; margin-top: var(--space-1); color: var(--color-primary);">No active season</div>
+              <div id="activeSeasonDates" class="text-muted" style="font-size: var(--font-xs); margin-top: 2px;">-</div>
+            </div>
+          </div>
+
+          <!-- Recent Activity Feed Card -->
+          <div class="card home-activity-card">
+            <h3 style="font-size: var(--font-md); font-weight: 700; margin-bottom: var(--space-4);">Recent System Activity</h3>
+            <div id="activityEmpty" class="text-muted" style="display: none; padding: var(--space-4) 0;">No recent activity logged.</div>
+            <ul id="activityList" class="home-activity-list"></ul>
+          </div>
+        </div>
+
+        <!-- 5. Account Profile Card -->
+        <div class="card home-account-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-4); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-3);">
+            <div>
+              <h3 style="font-size: var(--font-lg); font-weight: 700; margin: 0;">Administrator Profile</h3>
+              <p class="text-muted" style="font-size: var(--font-xs); margin-top: 2px; margin-bottom: 0;">Credentials and session details.</p>
+            </div>
+            <button type="button" class="btn btn-outline" id="openChangePasswordBtn">
+              Change password
+            </button>
+          </div>
+
+          <div class="home-account-grid">
+            <div>
+              <span class="text-muted" style="font-size: var(--font-xs); font-weight: 600;">FULL NAME</span>
+              <div id="accFullName" style="font-size: var(--font-base); font-weight: 600; margin-top: 2px;">-</div>
+            </div>
+            <div>
+              <span class="text-muted" style="font-size: var(--font-xs); font-weight: 600;">USERNAME</span>
+              <div id="accUsername" style="font-size: var(--font-base); font-weight: 600; margin-top: 2px;">-</div>
+            </div>
+            <div>
+              <span class="text-muted" style="font-size: var(--font-xs); font-weight: 600;">EMAIL ADDRESS</span>
+              <div id="accEmail" style="font-size: var(--font-base); font-weight: 600; margin-top: 2px;">-</div>
+            </div>
+            <div>
+              <span class="text-muted" style="font-size: var(--font-xs); font-weight: 600;">ASSIGNED ROLE</span>
+              <div style="margin-top: 4px;">
+                <span id="accRoleBadge" class="badge badge-slate pill-w-sm">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Support Disclaimer Footer -->
+        <footer style="margin-top: var(--space-8); text-align: center; font-size: var(--font-xs); color: var(--color-text-muted);">
+          <p style="margin-bottom: 0;">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</p>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- 6. Change Password Dialog Modal -->
+  <dialog id="changePasswordModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Change Password</h2>
+    </div>
+
+    <!-- In-dialog Error Banner -->
+    <div id="modalAlertError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-4);">
+      <span id="modalAlertErrorText"></span>
+    </div>
+
+    <form id="changePasswordForm" novalidate>
+      <div class="form-group">
+        <label for="currentPasswordInput">Current password <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="password" 
+          id="currentPasswordInput" 
+          name="current_password" 
+          autocomplete="current-password" 
+          required
+        >
+        <div id="currentPasswordError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="newPasswordInput">New password <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="password" 
+          id="newPasswordInput" 
+          name="new_password" 
+          autocomplete="new-password" 
+          required
+        >
+        <div id="newPasswordError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPasswordInput">Confirm new password <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="password" 
+          id="confirmPasswordInput" 
+          name="confirm_password" 
+          autocomplete="new-password" 
+          required
+        >
+        <div id="confirmPasswordError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: var(--space-4);">
+        <label class="checkbox-label" for="togglePasswordsCheckbox" style="font-size: var(--font-xs); font-weight: normal; cursor: pointer;">
+          <input type="checkbox" id="togglePasswordsCheckbox">
+          <span>Show passwords</span>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="modalSubmitBtn">Update Password</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

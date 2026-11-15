@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Admin Sign In
+  Authentication portal for METLINK market advisors and administrators.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Admin Sign In</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="card auth-card">
+      <header class="auth-header">
+        <h1 class="brand-title">METLINK</h1>
+        <p class="brand-subtitle">Admin sign in</p>
+      </header>
+
+      <div id="alertBox" class="alert alert-error" role="alert" style="display: none;"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            autocomplete="username" 
+            required 
+            placeholder="e.g. aline.uwase"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            autocomplete="current-password" 
+            required 
+            placeholder="Enter your password"
+          >
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary w-full">
+          Sign in
+        </button>
+      </form>
+
+      <div class="text-center" style="margin-top: var(--space-4);">
+        <a href="index.html" class="text-muted" style="font-size: var(--font-sm);">&larr; Back to public portal</a>
+      </div>
+
+      <div class="alert alert-info" style="margin-top: var(--space-6); margin-bottom: var(--space-3); font-size: var(--font-xs);">
+        <span>Farmers are registered by admins only. Farmers use USSD, not this website.</span>
+      </div>
+
+      <footer class="auth-footer">
+        <p style="font-size: var(--font-xs); color: var(--color-text-muted); line-height: 1.4; margin: 0;">
+          METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.
+        </p>
+      </footer>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // Immediate redirect check if admin already has an active session
+    MetlinkAuth.redirectIfLoggedIn();
+
+    document.addEventListener('DOMContentLoaded', () => {
+      MetlinkAuth.redirectIfLoggedIn();
+
+      const loginForm = document.getElementById('loginForm');
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const submitBtn = document.getElementById('submitBtn');
+      const alertBox = document.getElementById('alertBox');
+
+      function showError(message) {
+        alertBox.textContent = message;
+        alertBox.style.display = 'flex';
+      }
+
+      function hideError() {
+        alertBox.textContent = '';
+        alertBox.style.display = 'none';
+      }
+
+      loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideError();
+
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) {
+          showError('Please enter both username and password.');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        const defaultBtnText = submitBtn.textContent;
+        submitBtn.innerHTML = '<span class="spinner" style="margin-right: 8px;"></span> Signing in...';
+
+        try {
+          await MetlinkAuth.login(username, password);
+          window.location.href = 'dashboard.html';
+        } catch (error) {
+          showError(error.message || 'Login failed. Please verify your credentials.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = defaultBtnText;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
