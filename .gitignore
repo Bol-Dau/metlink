@@ -1,0 +1,33 @@
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.*
+
+# Database Dumps & Backups
+*.sql.gz
+*.dump
+*.bak
+*.db
+*.sqlite
+*.sqlite3
+backups/
+dumps/
+
+# Local PostgreSQL Data & Temp Files
+pgdata/
+postgres_data/
+*.tmp
+*.temp
+*.log
+
+# Python Bytecode & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
