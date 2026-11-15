@@ -31,3 +31,8 @@ __pycache__/
 venv/
 env/
 .pytest_cache/
+
+# Other Files
+.antigravity/
+SPEC.md
+tests.md

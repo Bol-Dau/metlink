@@ -85,3 +85,38 @@ def admin_required(fn):
         return fn(*args, **kwargs)
 
     return wrapper
+
+
+def super_admin_required(fn):
+    """
+    Route decorator requiring an active super_admin session.
+    Stackable under @admin_required.
+    Loads role and is_active directly from the database (not from token).
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        admin = getattr(g, "current_admin", None)
+        if not admin or "admin_id" not in admin:
+            return jsonify({"error": "Authentication required."}), 401
+
+        admin_id = admin["admin_id"]
+        with get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT role, is_active
+                FROM admins
+                WHERE admin_id = %s;
+                """,
+                (admin_id,),
+            )
+            admin_row = cur.fetchone()
+
+        if not admin_row or admin_row["role"] != "super_admin" or not admin_row["is_active"]:
+            return jsonify({"error": "Super admin access required."}), 403
+
+        g.current_admin["role"] = admin_row["role"]
+        g.current_admin["is_active"] = admin_row["is_active"]
+        return fn(*args, **kwargs)
+
+    return wrapper
+

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Agricultural Seasons Management
+  Admin portal for viewing, adding, editing, and managing Rwandan agricultural seasons (A, B, C).
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Seasons</title>
+  <script src="js/sidebar.js"></script>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    /* Modal Dialog Styles */
+    dialog.modal-dialog {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      max-width: 520px;
+      width: 90%;
+      margin: auto;
+      background-color: var(--color-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    dialog.modal-dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-header {
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .modal-title {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-top: var(--space-6);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    /* Small action buttons in table */
+    .btn-sm {
+      min-height: 32px;
+      min-width: 32px;
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--font-xs);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background-color: var(--color-surface-hover);
+      border-color: var(--color-border-hover);
+    }
+
+    .badge-inactive {
+      background-color: var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    /* Table container for responsive horizontal scrolling */
+    .table-container {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+      min-width: 760px;
+      white-space: nowrap;
+    }
+
+    .desc-cell {
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .field-error {
+      color: var(--color-danger);
+      font-size: var(--font-xs);
+      margin-top: var(--space-1);
+    }
+
+    .input-error {
+      border-color: var(--color-danger) !important;
+    }
+
+    .field-hint {
+      color: var(--color-text-muted);
+      font-size: var(--font-xs);
+      margin-top: var(--space-1);
+      line-height: 1.4;
+    }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: var(--font-sm);
+      user-select: none;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-height: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="fixed-pills">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 style="color: var(--color-primary); font-size: var(--font-xl);">METLINK</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link">Dashboard</a>
+        <a href="farmers.html" class="sidebar-link">Farmers</a>
+        <a href="markets.html" class="sidebar-link">Markets</a>
+        <a href="seasons.html" class="sidebar-link active">Seasons</a>
+        <a href="rules.html" class="sidebar-link">Rules</a>
+        <a href="logs.html" class="sidebar-link">Logs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="btn btn-secondary w-full" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <span style="font-weight: 600;">Admin Dashboard</span>
+        <span id="adminName" class="badge badge-primary"></span>
+      </header>
+
+      <main class="main-content">
+        <!-- Global Feedback Banners -->
+        <div id="feedbackContainer" style="margin-bottom: var(--space-4);">
+          <div id="alertSuccess" class="alert alert-success" role="status" aria-live="polite" style="display: none;">
+            <span id="alertSuccessText"></span>
+          </div>
+          <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
+            <span id="alertErrorText"></span>
+            <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Seasons</h1>
+            <p class="page-subtitle">Configure agricultural seasons used for harvest evaluations and decision advice.</p>
+          </div>
+          <button id="openAddSeasonBtn" class="btn btn-primary" type="button">
+            + Add Season
+          </button>
+        </div>
+
+        <!-- Summary Strip -->
+        <div class="grid grid-cols-2" style="margin-bottom: var(--space-6);">
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Total Seasons</span>
+            <div id="totalCount" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1);">0</div>
+          </div>
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Currently Active Season</span>
+            <div id="activeSeasonName" style="font-size: var(--font-2xl); font-weight: 700; color: var(--color-secondary); margin-top: var(--space-1);">None active</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3" style="flex: 1; min-width: 260px;">
+              <div style="flex: 1; min-width: 180px;">
+                <input 
+                  type="text" 
+                  id="searchInput" 
+                  placeholder="Search by season name or description..." 
+                  aria-label="Search seasons by name or description"
+                >
+              </div>
+              <div style="width: 150px;">
+                <select id="statusFilter" aria-label="Filter by status">
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div id="showingCountText" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+              Showing 0 of 0 seasons
+            </div>
+          </div>
+        </div>
+
+        <!-- Seasons Table Card -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <!-- Loading State -->
+          <div id="tableLoading" class="text-center" style="padding: var(--space-8); display: none;">
+            <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+            <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading agricultural seasons...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div id="tableEmpty" class="text-center" style="padding: var(--space-8); display: none;">
+            <p id="emptyMessage" class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No seasons registered yet.</p>
+          </div>
+
+          <!-- Table Container -->
+          <div id="tableWrapper" class="table-container">
+            <table class="table" id="seasonsTable">
+              <thead>
+                <tr>
+                  <th scope="col">Season</th>
+                  <th scope="col">Start</th>
+                  <th scope="col">End</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Added by</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="seasonsTableBody">
+                <!-- Dynamically populated via seasons.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Decision Support Disclaimer -->
+        <footer style="margin-top: var(--space-8); text-align: center; font-size: var(--font-xs); color: var(--color-text-muted);">
+          <p style="margin-bottom: 0;">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</p>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- Season Suggestions Datalist -->
+  <datalist id="seasonSuggestions">
+    <option value="Season A 2026"></option>
+    <option value="Season B 2026"></option>
+    <option value="Season C 2026"></option>
+    <option value="Season A 2027"></option>
+    <option value="Season B 2027"></option>
+    <option value="Season C 2027"></option>
+  </datalist>
+
+  <!-- Add Season Modal Dialog -->
+  <dialog id="addSeasonModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Season</h2>
+    </div>
+
+    <div id="addModalError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-3);"></div>
+
+    <form id="addSeasonForm" novalidate>
+      <div class="form-group">
+        <label for="addSeasonName">Season name <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="addSeasonName" 
+          name="season_name" 
+          list="seasonSuggestions"
+          required 
+          placeholder="e.g. Season A 2027" 
+          autocomplete="off"
+        >
+        <div class="field-hint">
+          Rwandan agricultural seasons guidance: Season A (Sep–Jan), Season B (Feb–Jun), Season C (Jul–Sep, dry season). You may also enter custom season names.
+        </div>
+        <div id="addSeasonNameError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="grid grid-cols-2" style="gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="addStartDate">Start date <span style="color: var(--color-danger);">*</span></label>
+          <input 
+            type="date" 
+            id="addStartDate" 
+            name="start_date" 
+            required
+          >
+          <div id="addStartDateError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="addEndDate">End date <span style="color: var(--color-danger);">*</span></label>
+          <input 
+            type="date" 
+            id="addEndDate" 
+            name="end_date" 
+            required
+          >
+          <div id="addEndDateError" class="field-error" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="addDescription">Description</label>
+        <textarea 
+          id="addDescription" 
+          name="description" 
+          rows="3" 
+          placeholder="e.g. Short rains planting and primary tomato harvest season across Kamonyi."
+        ></textarea>
+        <div id="addDescriptionError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group" style="margin-top: var(--space-2);">
+        <label class="checkbox-label" for="addIsActive">
+          <input type="checkbox" id="addIsActive" name="is_active">
+          <span>Set as currently active season</span>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="addCancelBtn" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="addSubmitBtn" class="btn btn-primary">Add Season</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit Season Modal Dialog -->
+  <dialog id="editSeasonModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Edit Season</h2>
+    </div>
+
+    <div id="editModalError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-3);"></div>
+
+    <form id="editSeasonForm" novalidate>
+      <input type="hidden" id="editSeasonId">
+
+      <div class="form-group">
+        <label for="editSeasonName">Season name <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="editSeasonName" 
+          name="season_name" 
+          list="seasonSuggestions"
+          required 
+          autocomplete="off"
+        >
+        <div class="field-hint">
+          Rwandan agricultural seasons guidance: Season A (Sep–Jan), Season B (Feb–Jun), Season C (Jul–Sep, dry season). You may also enter custom season names.
+        </div>
+        <div id="editSeasonNameError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="grid grid-cols-2" style="gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="editStartDate">Start date <span style="color: var(--color-danger);">*</span></label>
+          <input 
+            type="date" 
+            id="editStartDate" 
+            name="start_date" 
+            required
+          >
+          <div id="editStartDateError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="editEndDate">End date <span style="color: var(--color-danger);">*</span></label>
+          <input 
+            type="date" 
+            id="editEndDate" 
+            name="end_date" 
+            required
+          >
+          <div id="editEndDateError" class="field-error" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="editDescription">Description</label>
+        <textarea 
+          id="editDescription" 
+          name="description" 
+          rows="3"
+        ></textarea>
+        <div id="editDescriptionError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group" style="margin-top: var(--space-2);">
+        <label class="checkbox-label" for="editIsActive">
+          <input type="checkbox" id="editIsActive" name="is_active">
+          <span>Set as currently active season</span>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="editCancelBtn" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="editSubmitBtn" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seasons.js"></script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Farmers Management
+  Admin portal for registering, viewing, editing, and managing Kamonyi tomato farmers.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Farmers</title>
+  <script src="js/sidebar.js"></script>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    /* Modal Dialog Styles */
+    dialog.modal-dialog {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      max-width: 480px;
+      width: 90%;
+      margin: auto;
+      background-color: var(--color-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    dialog.modal-dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-header {
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .modal-title {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-top: var(--space-6);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    /* Small action buttons in table */
+    .btn-sm {
+      min-height: 32px;
+      min-width: 32px;
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--font-xs);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background-color: var(--color-surface-hover);
+      border-color: var(--color-border-hover);
+    }
+
+    .badge-inactive {
+      background-color: var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    /* Table minimum width ensures smooth horizontal scroll on small viewports */
+    .table-container {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+      min-width: 720px;
+      white-space: nowrap;
+    }
+
+    .field-error {
+      color: var(--color-danger);
+      font-size: var(--font-xs);
+      margin-top: var(--space-1);
+    }
+
+    .input-error {
+      border-color: var(--color-danger) !important;
+    }
+  </style>
+</head>
+<body class="fixed-pills">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 style="color: var(--color-primary); font-size: var(--font-xl);">METLINK</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link">Dashboard</a>
+        <a href="farmers.html" class="sidebar-link active">Farmers</a>
+        <a href="markets.html" class="sidebar-link">Markets</a>
+        <a href="seasons.html" class="sidebar-link">Seasons</a>
+        <a href="rules.html" class="sidebar-link">Rules</a>
+        <a href="logs.html" class="sidebar-link">Logs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="btn btn-secondary w-full" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <span style="font-weight: 600;">Admin Dashboard</span>
+        <span id="adminName" class="badge badge-primary"></span>
+      </header>
+
+      <main class="main-content">
+        <!-- Global Feedback Banners -->
+        <div id="feedbackContainer" style="margin-bottom: var(--space-4);">
+          <div id="alertSuccess" class="alert alert-success" role="status" aria-live="polite" style="display: none;">
+            <span id="alertSuccessText"></span>
+          </div>
+          <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
+            <span id="alertErrorText"></span>
+            <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Farmers</h1>
+            <p class="page-subtitle">Manage registered tomato farmers in Kamonyi district.</p>
+          </div>
+          <button id="openRegisterBtn" class="btn btn-primary" type="button">
+            + Register Farmer
+          </button>
+        </div>
+
+        <!-- Summary Strip -->
+        <div class="grid grid-cols-3" style="margin-bottom: var(--space-6);">
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Total Farmers</span>
+            <div id="totalCount" style="font-size: var(--font-2xl); font-weight: 700; margin-top: var(--space-1);">0</div>
+          </div>
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Active</span>
+            <div id="activeCount" style="font-size: var(--font-2xl); font-weight: 700; color: var(--color-secondary); margin-top: var(--space-1);">0</div>
+          </div>
+          <div class="card">
+            <span class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">Inactive</span>
+            <div id="inactiveCount" style="font-size: var(--font-2xl); font-weight: 700; color: var(--color-text-muted); margin-top: var(--space-1);">0</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3" style="flex: 1; min-width: 260px;">
+              <div style="flex: 1; min-width: 180px;">
+                <input 
+                  type="text" 
+                  id="searchInput" 
+                  placeholder="Search name, phone, location, registered by or date" 
+                  aria-label="Search name, phone, location, registered by or date"
+                >
+              </div>
+              <div style="width: 150px;">
+                <select id="statusFilter" aria-label="Filter by status">
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div id="showingCountText" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+              Showing 0 of 0 farmers
+            </div>
+          </div>
+        </div>
+
+        <!-- Farmers Table Card -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <!-- Loading State -->
+          <div id="tableLoading" class="text-center" style="padding: var(--space-8); display: none;">
+            <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+            <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading farmers list...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div id="tableEmpty" class="text-center" style="padding: var(--space-8); display: none;">
+            <p id="emptyMessage" class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No farmers registered yet.</p>
+          </div>
+
+          <!-- Table Container -->
+          <div id="tableWrapper" class="table-container">
+            <table class="table" id="farmersTable">
+              <thead>
+                <tr>
+                  <th scope="col" data-sort="name" title="Sort column" tabindex="0" aria-sort="none">Name</th>
+                  <th scope="col">Phone</th>
+                  <th scope="col" data-sort="location" title="Sort column" tabindex="0" aria-sort="none">Location</th>
+                  <th scope="col">Language</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" data-sort="registered_by_name" title="Sort column" tabindex="0" aria-sort="none">Registered by</th>
+                  <th scope="col">Registered on</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="farmersTableBody">
+                <!-- Dynamically populated via farmers.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Decision Support Disclaimer -->
+        <footer style="margin-top: var(--space-8); text-align: center; font-size: var(--font-xs); color: var(--color-text-muted);">
+          <p style="margin-bottom: 0;">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</p>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- Register Farmer Modal Dialog -->
+  <dialog id="registerModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Register Farmer</h2>
+    </div>
+
+    <div id="registerModalError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-3);"></div>
+
+    <form id="registerForm" novalidate>
+      <div class="form-group">
+        <label for="regPhone">Phone number <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="tel" 
+          id="regPhone" 
+          name="phone_number" 
+          required 
+          placeholder="e.g. 0788123456 or +250788123456" 
+          autocomplete="off"
+        >
+        <div id="regPhoneError" class="field-error" style="display: none;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="regName">Full name <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="regName" 
+          name="name" 
+          required 
+          placeholder="e.g. Jean Bosco Habimana" 
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="regLocation">Sector / location <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="regLocation" 
+          name="location" 
+          required 
+          placeholder="e.g. Runda, Gacurabwenge" 
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="regLanguage">Preferred language</label>
+        <select id="regLanguage" name="preferred_language">
+          <option value="rw" selected>Kinyarwanda (rw)</option>
+          <option value="en">English (en)</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="regCancelBtn" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="regSubmitBtn" class="btn btn-primary">Register Farmer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit Farmer Modal Dialog -->
+  <dialog id="editModal" class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Edit Farmer</h2>
+    </div>
+
+    <div id="editModalError" class="alert alert-error" role="alert" style="display: none; margin-bottom: var(--space-3);"></div>
+
+    <form id="editForm" novalidate>
+      <input type="hidden" id="editFarmerId">
+
+      <div class="form-group">
+        <label for="editPhone">Phone number (read-only)</label>
+        <input 
+          type="text" 
+          id="editPhone" 
+          readonly 
+          disabled 
+          style="background-color: var(--color-surface-alt); cursor: not-allowed;"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="editName">Full name <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="editName" 
+          name="name" 
+          required 
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="editLocation">Sector / location <span style="color: var(--color-danger);">*</span></label>
+        <input 
+          type="text" 
+          id="editLocation" 
+          name="location" 
+          required 
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="editLanguage">Preferred language</label>
+        <select id="editLanguage" name="preferred_language">
+          <option value="rw">Kinyarwanda (rw)</option>
+          <option value="en">English (en)</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="editCancelBtn" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="editSubmitBtn" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/farmers.js"></script>
+</body>
+</html>

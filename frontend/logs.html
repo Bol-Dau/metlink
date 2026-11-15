@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<!--
+  METLINK — Activity and System Logs
+  Read-only inspection portal for Harvest Submissions, SMS Delivery Logs, and Admin Audit Trail.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Logs and Activity</title>
+  <script src="js/sidebar.js"></script>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body class="fixed-pills">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 style="color: var(--color-primary); font-size: var(--font-xl);">METLINK</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link">Dashboard</a>
+        <a href="farmers.html" class="sidebar-link">Farmers</a>
+        <a href="markets.html" class="sidebar-link">Markets</a>
+        <a href="seasons.html" class="sidebar-link">Seasons</a>
+        <a href="rules.html" class="sidebar-link">Rules</a>
+        <a href="logs.html" class="sidebar-link active">Logs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="btn btn-secondary w-full" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <span style="font-weight: 600;">Admin Dashboard</span>
+        <span id="adminName" class="badge badge-primary"></span>
+      </header>
+
+      <main class="main-content">
+        <!-- Global Feedback Banners -->
+        <div id="feedbackContainer" style="margin-bottom: var(--space-4);">
+          <div id="alertSuccess" class="alert alert-success" role="status" aria-live="polite" style="display: none;">
+            <span id="alertSuccessText"></span>
+          </div>
+          <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
+            <span id="alertErrorText"></span>
+            <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Logs and Activity</h1>
+            <p class="page-subtitle">Inspect farmer harvest submissions, SMS dispatch notifications, and administrator audit history.</p>
+          </div>
+          <button id="refreshBtn" class="btn btn-outline" type="button" aria-label="Refresh current tab data">
+            &#x21bb; Refresh
+          </button>
+        </div>
+
+        <!-- Accessible Tabs Navigation -->
+        <div class="tab-list" role="tablist" aria-label="Activity Logs">
+          <button role="tab" id="tab-submissions" class="tab-btn" aria-selected="true" aria-controls="panel-submissions" tabindex="0">
+            Submissions
+          </button>
+          <button role="tab" id="tab-sms" class="tab-btn" aria-selected="false" aria-controls="panel-sms" tabindex="-1">
+            SMS Logs
+          </button>
+          <button role="tab" id="tab-audit" class="tab-btn" aria-selected="false" aria-controls="panel-audit" tabindex="-1">
+            Audit Logs
+          </button>
+        </div>
+
+        <!-- TAB 1: Submissions Panel -->
+        <section role="tabpanel" id="panel-submissions" aria-labelledby="tab-submissions">
+          <!-- Filter Bar -->
+          <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div style="flex: 1; min-width: 240px;">
+                <input 
+                  type="text" 
+                  id="search-submissions" 
+                  placeholder="Search by farmer, location, status, or advice..." 
+                  aria-label="Search submissions"
+                >
+              </div>
+              <div id="showing-submissions" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+                Showing 0 of 0
+              </div>
+            </div>
+          </div>
+
+          <!-- Submissions Table Card -->
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div id="loading-submissions" class="text-center" style="padding: var(--space-8); display: none;">
+              <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+              <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading submissions...</p>
+            </div>
+
+            <div id="empty-submissions" class="text-center" style="padding: var(--space-8); display: none;">
+              <p class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No submissions found.</p>
+            </div>
+
+            <div id="wrapper-submissions" class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Submitted</th>
+                    <th scope="col" data-sort="farmer_name" title="Sort column" tabindex="0" aria-sort="none">Farmer</th>
+                    <th scope="col" data-sort="location" title="Sort column" tabindex="0" aria-sort="none">Location</th>
+                    <th scope="col" data-sort="tomato_maturity" title="Sort column" tabindex="0" aria-sort="none">Maturity</th>
+                    <th scope="col">Quantity</th>
+                    <th scope="col" data-sort="has_suitable_preservation" title="Sort column" tabindex="0" aria-sort="none">Storage</th>
+                    <th scope="col" data-sort="status" title="Sort column" tabindex="0" aria-sort="none">Status</th>
+                    <th scope="col" data-sort="recommended_action" title="Sort column" tabindex="0" aria-sort="none">Advice Result</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-submissions">
+                  <!-- Injected via logs.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-bar" id="pagination-submissions" style="display: none;">
+              <span class="text-muted" style="font-size: var(--font-sm);" id="page-info-submissions">Page 1 of 1</span>
+              <div style="display: flex; gap: var(--space-2);">
+                <button type="button" class="btn btn-outline btn-sm" id="prev-submissions" disabled>&larr; Previous</button>
+                <button type="button" class="btn btn-outline btn-sm" id="next-submissions" disabled>Next &rarr;</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: SMS Logs Panel -->
+        <section role="tabpanel" id="panel-sms" aria-labelledby="tab-sms" hidden>
+          <!-- Filter Bar -->
+          <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div style="flex: 1; min-width: 240px;">
+                <input 
+                  type="text" 
+                  id="search-sms" 
+                  placeholder="Search by phone, farmer, message, or status..." 
+                  aria-label="Search SMS logs"
+                >
+              </div>
+              <div id="showing-sms" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+                Showing 0 of 0
+              </div>
+            </div>
+          </div>
+
+          <!-- SMS Table Card -->
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div id="loading-sms" class="text-center" style="padding: var(--space-8); display: none;">
+              <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+              <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading SMS logs...</p>
+            </div>
+
+            <div id="empty-sms" class="text-center" style="padding: var(--space-8); display: none;">
+              <p class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No SMS logs found.</p>
+            </div>
+
+            <div id="wrapper-sms" class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Sent Time</th>
+                    <th scope="col">Recipient</th>
+                    <th scope="col">Message Content</th>
+                    <th scope="col">Delivery Status</th>
+                    <th scope="col">Delivered At</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-sms">
+                  <!-- Injected via logs.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-bar" id="pagination-sms" style="display: none;">
+              <span class="text-muted" style="font-size: var(--font-sm);" id="page-info-sms">Page 1 of 1</span>
+              <div style="display: flex; gap: var(--space-2);">
+                <button type="button" class="btn btn-outline btn-sm" id="prev-sms" disabled>&larr; Previous</button>
+                <button type="button" class="btn btn-outline btn-sm" id="next-sms" disabled>Next &rarr;</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: Audit Logs Panel -->
+        <section role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden>
+          <!-- Filter Bar -->
+          <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-4);">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div style="flex: 1; min-width: 240px;">
+                <input 
+                  type="text" 
+                  id="search-audit" 
+                  placeholder="Search by admin, action, target entity, or details..." 
+                  aria-label="Search audit logs"
+                >
+              </div>
+              <div id="showing-audit" class="text-muted" style="font-size: var(--font-sm); font-weight: 600;">
+                Showing 0 of 0
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit Table Card -->
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div id="loading-audit" class="text-center" style="padding: var(--space-8); display: none;">
+              <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+              <p class="text-muted" style="margin-top: var(--space-2); margin-bottom: 0;">Loading audit logs...</p>
+            </div>
+
+            <div id="empty-audit" class="text-center" style="padding: var(--space-8); display: none;">
+              <p class="text-muted" style="font-size: var(--font-md); margin-bottom: 0;">No audit records found.</p>
+            </div>
+
+            <div id="wrapper-audit" class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Timestamp</th>
+                    <th scope="col">Administrator</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Target Entity</th>
+                    <th scope="col">Record ID</th>
+                    <th scope="col">Details</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-audit">
+                  <!-- Injected via logs.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-bar" id="pagination-audit" style="display: none;">
+              <span class="text-muted" style="font-size: var(--font-sm);" id="page-info-audit">Page 1 of 1</span>
+              <div style="display: flex; gap: var(--space-2);">
+                <button type="button" class="btn btn-outline btn-sm" id="prev-audit" disabled>&larr; Previous</button>
+                <button type="button" class="btn btn-outline btn-sm" id="next-audit" disabled>Next &rarr;</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Decision Support Disclaimer -->
+        <footer style="margin-top: var(--space-8); text-align: center; font-size: var(--font-xs); color: var(--color-text-muted);">
+          <p style="margin-bottom: 0;">METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.</p>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/logs.js"></script>
+</body>
+</html>
