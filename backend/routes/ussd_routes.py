@@ -13,7 +13,9 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import time
 from decimal import Decimal
+from typing import Optional
 
 from flask import Blueprint, make_response, request
 
@@ -55,100 +57,170 @@ def _plain(text: str, status: int = 200):
     return resp
 
 
+def make_ussd_response(body: str):
+    """
+    Guarantees:
+    - body starts with 'CON ' or 'END ' (otherwise forces error END)
+    - no leading whitespace
+    - at most 182 characters (truncates dynamic text with warning)
+    - Content-Type exactly 'text/plain; charset=utf-8'
+    - status 200
+    """
+    clean = (body or "").lstrip()
+    if not (clean.startswith("CON ") or clean.startswith("END ")):
+        clean = "END " + menus.screen_service_error()
+
+    if len(clean) > 182:
+        logger.warning(
+            "Truncating USSD response exceeding 182 chars (%d chars): %r",
+            len(clean),
+            clean,
+        )
+        clean = clean[:181] + "~"
+
+    resp = make_response(clean, 200)
+    resp.content_type = "text/plain; charset=utf-8"
+    return resp
+
+
+@ussd_bp.app_errorhandler(404)
+def _handle_ussd_404(err):
+    if request.path.startswith("/api/ussd"):
+        return make_ussd_response("END " + menus.screen_service_error())
+    return err
+
+
+@ussd_bp.app_errorhandler(405)
+def _handle_ussd_405(err):
+    if request.path.startswith("/api/ussd"):
+        return make_ussd_response("END " + menus.screen_service_error())
+    return err
+
+
 # ── USSD Callback ────────────────────────────────────────────────────────────
 
 @ussd_bp.post("/ussd/callback")
 def ussd_callback():
-    if not _check_token():
-        return _plain("Forbidden", 403)
-
+    start_time = time.monotonic()
     session_id = request.form.get("sessionId", "")
     phone_raw  = request.form.get("phoneNumber", "")
     text       = request.form.get("text", "")
-
     masked = sms_service.mask_phone(phone_raw)
+
     logger.info("USSD callback sid=%s phone=%s text=%r", session_id, masked, text)
 
     try:
+        # A wrong token returns 403 (this is a configuration error)
+        if not _check_token():
+            return _plain("Forbidden", 403)
+
         response_text = _handle_ussd(session_id, phone_raw, text)
+        resp = make_ussd_response(response_text)
     except Exception:
         logger.exception("Unhandled error in USSD callback sid=%s phone=%s", session_id, masked)
-        response_text = "END " + menus.screen_service_error()
+        resp = make_ussd_response("END " + menus.screen_service_error())
 
-    return _plain(response_text)
+    elapsed_ms = (time.monotonic() - start_time) * 1000.0
+    step_hint = text.split("*")[-1] if text else "root"
+    logger.info("USSD callback finished sid=%s step=%s elapsed=%.1fms", session_id, step_hint, elapsed_ms)
+    if elapsed_ms > 1000.0:
+        logger.warning("USSD callback took >1000ms: sid=%s elapsed=%.1fms", session_id, elapsed_ms)
+
+    return resp
 
 
 def _handle_ussd(session_id: str, phone_raw: str, text: str) -> str:
     """
     Core USSD handler. Returns a string starting with "CON " or "END ".
     """
-    tokens = text.split("*") if text else []
+    acquired = session_store.acquire_session_lock(session_id, timeout=5.0)
+    if not acquired:
+        logger.warning("Session lock acquisition timed out for sid=%s", session_id)
+        return "END " + menus.screen_service_error()
 
-    # ── 1. Farmer lookup (one connection, released immediately) ───────────────
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            status, farmer = get_farmer_by_phone(cur, phone_raw)
+    try:
+        cached = session_store.get_cached_response(session_id, text)
+        if cached:
+            logger.info("Replay from cache sid=%s text=%r", session_id, text)
+            return cached
 
-    if status == "NOT_FOUND":
-        return "END " + menus.screen_not_registered()
-    if status == "INACTIVE":
-        return "END " + menus.screen_inactive()
+        tokens = text.split("*") if text else []
 
-    # ── 2. Run stateless menu logic ───────────────────────────────────────────
-    kind, payload = menus.handle(tokens, farmer)
+        # ── 1. Farmer lookup (one connection, released immediately) ───────────────
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                status, farmer = get_farmer_by_phone(cur, phone_raw)
 
-    # ── 3. Language update (persist only when language token just selected) ───
-    if tokens and tokens[0] in ("1", "2"):
-        new_lang = "en" if tokens[0] == "1" else "rw"
-        if new_lang != farmer.get("preferred_language"):
+        if status == "NOT_FOUND":
+            res = "END " + menus.screen_not_registered()
+            session_store.cache_response(session_id, text, res)
+            return res
+        if status == "INACTIVE":
+            res = "END " + menus.screen_inactive()
+            session_store.cache_response(session_id, text, res)
+            return res
+
+        # ── 2. Run stateless menu logic ───────────────────────────────────────────
+        kind, payload = menus.handle(tokens, farmer)
+
+        # ── 3. Language update (persist when valid language choice made) ──────────
+        chosen_lang = None
+        for t in tokens:
+            tok = t.strip()
+            if tok in ("1", "2"):
+                chosen_lang = "en" if tok == "1" else "rw"
+                break
+        if chosen_lang and chosen_lang != farmer.get("preferred_language"):
             try:
                 with get_connection() as conn:
                     with conn.cursor() as cur:
-                        set_language(cur, farmer["farmer_id"], new_lang)
-                farmer["preferred_language"] = new_lang
+                        set_language(cur, farmer["farmer_id"], chosen_lang)
+                farmer["preferred_language"] = chosen_lang
             except Exception:
                 logger.warning("Failed to persist language for farmer %s", farmer["farmer_id"])
 
-    # ── 4. Submissions leaf ────────────────────────────────────────────────────
-    if kind == "NEED_SUBMISSIONS":
-        lang = payload  # payload is the lang string here
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                rows = engine.list_submissions(cur, farmer["farmer_id"], limit=3)
-        body = menus.screen_submissions(lang, rows)
-        return "END " + body
+        # ── 4. Submissions leaf ────────────────────────────────────────────────────
+        if kind == "NEED_SUBMISSIONS":
+            lang = payload
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    rows = engine.list_submissions(cur, farmer["farmer_id"], limit=3)
+            body = menus.screen_submissions(lang, rows)
+            res = "END " + body
+            session_store.cache_response(session_id, text, res)
+            return res
 
-    # ── 5. Advice leaf ────────────────────────────────────────────────────────
-    if kind == "NEED_ADVICE":
-        lang = payload
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                rows = engine.list_recommendations(cur, farmer["farmer_id"], limit=3)
-        body = menus.screen_advice(lang, rows)
-        return "END " + body
+        # ── 5. Advice leaf ────────────────────────────────────────────────────────
+        if kind == "NEED_ADVICE":
+            lang = payload
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    rows = engine.list_recommendations(cur, farmer["farmer_id"], limit=3)
+            body = menus.screen_advice(lang, rows)
+            res = "END " + body
+            session_store.cache_response(session_id, text, res)
+            return res
 
-    # ── 6. Submit flow: CON or END with no DB work ────────────────────────────
-    if kind in ("CON", "END"):
-        return f"{kind} {payload}"
+        # ── 6. Submit flow: CON or END with no DB work ────────────────────────────
+        if kind in ("CON", "END"):
+            res = f"{kind} {payload}"
+            session_store.cache_response(session_id, text, res)
+            return res
 
-    # ── 7. DO_SUBMIT: confirm step hit ────────────────────────────────────────
-    if kind != "DO_SUBMIT":
-        return "END " + menus.screen_service_error()
+        # ── 7. DO_SUBMIT: confirm step hit ────────────────────────────────────────
+        if kind != "DO_SUBMIT":
+            res = "END " + menus.screen_service_error()
+            session_store.cache_response(session_id, text, res)
+            return res
 
-    lang, harvest_date, quantity_kg, maturity, has_storage = payload
-
-    # Serialise concurrent submits for the same session
-    session_lock = session_store.get_session_lock(session_id)
-    with session_lock:
-        # Fast replay: same session already finished
-        cached = session_store.get_cached_end_response(session_id)
-        if cached:
-            logger.info("Replay from cache sid=%s", session_id)
-            return cached
+        lang, harvest_date, quantity_kg, maturity, has_storage = payload
 
         result = _do_submit(farmer, harvest_date, quantity_kg, maturity, has_storage, lang)
-        session_store.cache_end_response(session_id, result)
+        session_store.cache_response(session_id, text, result)
         return result
+
+    finally:
+        session_store.release_session_lock(session_id)
 
 
 def _do_submit(
@@ -220,10 +292,10 @@ def _do_submit(
     except engine.ValidationError as exc:
         logger.warning("ValidationError for %s code=%s: %s", masked, exc.code, exc)
         if exc.code == "BAD_DATE":
-            msg = menus.screen_bad_date(lang, str(exc))
+            msg = menus.screen_ask_date(lang, error=str(exc))
             return "CON " + msg
         if exc.code == "BAD_QUANTITY":
-            msg = menus.screen_bad_quantity(lang, str(exc))
+            msg = menus.screen_ask_quantity(lang, harvest_date, error=str(exc))
             return "CON " + msg
         return "END " + menus.screen_service_error()
 

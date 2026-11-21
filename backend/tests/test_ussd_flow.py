@@ -87,7 +87,7 @@ def setup_test_farmers():
                     (phone_number, name, location, preferred_language,
                      registration_source, registered_by, is_active)
                 VALUES (%s, 'TEST_Inactive', 'TestVillage', 'en', 'admin', %s, FALSE)
-                ON CONFLICT (phone_number) DO NOTHING;
+                ON CONFLICT (phone_number) DO UPDATE SET is_active = FALSE;
                 """,
                 (INACTIVE_PHONE, ADMIN_ID),
             )
@@ -189,8 +189,10 @@ def cleanup_test_farmers():
     return counts
 
 
-def ussd_post(client, phone, text, session_id="SID001", token_param=""):
+def ussd_post(client, phone, text, session_id=None, token_param=""):
     """Helper to POST to USSD callback."""
+    if session_id is None:
+        session_id = f"SID_{phone}"
     url = "/api/ussd/callback"
     if token_param:
         url += f"?token={token_param}"
@@ -213,13 +215,14 @@ def delivery_post(client, provider_id, status, failure_reason="", token_param=""
         "failureReason": failure_reason,
     })
 
-def _today_ddmmyyyy(offset: int = 1) -> str:
-    return (date.today() + timedelta(days=offset)).strftime("%d%m%Y")
+def _today_offset(offset: int = 20) -> date:
+    return date.today() + timedelta(days=offset)
 
-def _full_text(lang_choice: str, date_str: str, qty: str = "500",
+def _full_text(lang_choice: str, target_date: date, qty: str = "500",
                ripeness: str = "3", storage: str = "1", confirm: str = "1") -> str:
     """Build the full '*'-joined text for a complete submit flow."""
-    return f"{lang_choice}*1*{date_str}*{qty}*{ripeness}*{storage}*{confirm}"
+    d_str = target_date.strftime("%d-%m-%Y")
+    return f"{lang_choice}*1*{d_str}*{qty}*{ripeness}*{storage}*{confirm}"
 
 # ── All tests ─────────────────────────────────────────────────────────────────
 
@@ -246,8 +249,7 @@ def run_all_tests(app):
     # ── (b) English full flow — inside active season ──────────────────────────
     phone = TEST_PHONES[0]
     sid = "SID_EN_IN"
-    # Date inside Season A 2027 (2026-09-01 to 2027-01-31)
-    harvest_in = (date(2026, 12, 15)).strftime("%d%m%Y")
+    harvest_in = _today_offset(20)
     text = _full_text("1", harvest_in, "500", "3", "1", "1")
     _sms_calls.clear()
     r = ussd_post(client, phone, text, session_id=sid)
@@ -293,9 +295,9 @@ def run_all_tests(app):
                 sms_cnt = cur.fetchone()["cnt"]
                 report("(b) EN — sms_logs has SENT row", sms_cnt >= 1, f"got {sms_cnt}")
 
-    # Date outside active season (Feb 2027)
+    # Date outside active season
     sid2 = "SID_EN_OUT"
-    harvest_out = (date(2027, 2, 10)).strftime("%d%m%Y")
+    harvest_out = _today_offset(90)
     text_out = _full_text("1", harvest_out, "400", "1", "2", "1")
     r2 = ussd_post(client, phone, text_out, session_id=sid2)
     body2 = r2.data.decode()
@@ -306,7 +308,7 @@ def run_all_tests(app):
     # ── (c) Kinyarwanda full flow ─────────────────────────────────────────────
     phone_rw = TEST_PHONES[1]
     sid_rw = "SID_RW"
-    harvest_rw = (date(2026, 12, 20)).strftime("%d%m%Y")
+    harvest_rw = _today_offset(25)
     text_rw = _full_text("2", harvest_rw, "300", "2", "1", "1")
     _sms_calls.clear()
     r_rw = ussd_post(client, phone_rw, text_rw, session_id=sid_rw)
@@ -334,20 +336,21 @@ def run_all_tests(app):
         report(f"(d) {label} → CON re-prompt, no DB write",
                r.status_code == 200 and body.startswith("CON"), body[:100])
 
-    inv("99991399", "BADDATE", "Bad date (99/13/9999)")
-    inv("01011999", "PASTDATE", "Past date")
-    inv("*0", "QTY0", "Quantity 0")  # date then 0 qty
-    today_plus1 = _today_ddmmyyyy(1)
-    r = ussd_post(client, phone_d, f"1*1*{today_plus1}*0", session_id="SID_QTY0")
+    inv("32-11-2026", "BADCAL", "Bad calendar date")
+    inv("not-a-date", "BADFORMAT", "Bad format date")
+    inv("20-11-1999", "PASTDATE", "Past date")
+    d_valid = _today_offset(15)
+    dv_str = d_valid.strftime("%d-%m-%Y")
+    r = ussd_post(client, phone_d, f"1*1*{dv_str}*0", session_id="SID_QTY0")
     report("(d) Quantity 0 → CON",
            r.status_code == 200 and r.data.decode().startswith("CON"), r.data.decode()[:80])
-    r = ussd_post(client, phone_d, f"1*1*{today_plus1}*abc", session_id="SID_QTYTEXT")
+    r = ussd_post(client, phone_d, f"1*1*{dv_str}*abc", session_id="SID_QTYTEXT")
     report("(d) Quantity text → CON",
            r.status_code == 200 and r.data.decode().startswith("CON"), r.data.decode()[:80])
-    r = ussd_post(client, phone_d, f"1*1*{today_plus1}*500*7", session_id="SID_RIP7")
+    r = ussd_post(client, phone_d, f"1*1*{dv_str}*500*7", session_id="SID_RIP7")
     report("(d) Ripeness 7 → CON",
            r.status_code == 200 and r.data.decode().startswith("CON"), r.data.decode()[:80])
-    r = ussd_post(client, phone_d, f"1*1*{today_plus1}*500*3*3", session_id="SID_STOR3")
+    r = ussd_post(client, phone_d, f"1*1*{dv_str}*500*3*3", session_id="SID_STOR3")
     report("(d) Storage 3 → CON",
            r.status_code == 200 and r.data.decode().startswith("CON"), r.data.decode()[:80])
 
@@ -364,7 +367,8 @@ def run_all_tests(app):
 
     # ── (e) Back navigation + Cancel ─────────────────────────────────────────
     phone_e = TEST_PHONES[3]
-    td = _today_ddmmyyyy(2)
+    td = _today_offset(15)
+    td_str = td.strftime("%d-%m-%Y")
 
     # 0 from date screen → back to main
     r = ussd_post(client, phone_e, "1*1*0", session_id="SID_BACK_DATE")
@@ -372,19 +376,19 @@ def run_all_tests(app):
            r.data.decode().startswith("CON"), r.data.decode()[:80])
 
     # 0 from quantity screen → back to date
-    r = ussd_post(client, phone_e, f"1*1*{td}*0", session_id="SID_BACK_QTY")
+    r = ussd_post(client, phone_e, f"1*1*{td_str}*0", session_id="SID_BACK_QTY")
     b = r.data.decode()
     report("(e) 0 from quantity screen → CON re-ask date",
-           b.startswith("CON") and ("DDMMYYYY" in b or "itariki" in b.lower()), b[:80])
+           b.startswith("CON") and ("date" in b.lower() or "itariki" in b.lower()), b[:80])
 
     # 0 from ripeness → back to quantity
-    r = ussd_post(client, phone_e, f"1*1*{td}*500*0", session_id="SID_BACK_RIP")
+    r = ussd_post(client, phone_e, f"1*1*{td_str}*500*0", session_id="SID_BACK_RIP")
     b = r.data.decode()
     report("(e) 0 from ripeness screen → CON re-ask quantity",
            b.startswith("CON") and ("kg" in b.lower() or "quantity" in b.lower()), b[:80])
 
     # Cancel at confirm
-    r = ussd_post(client, phone_e, f"1*1*{td}*500*3*1*2", session_id="SID_CANCEL")
+    r = ussd_post(client, phone_e, f"1*1*{td_str}*500*3*1*2", session_id="SID_CANCEL")
     b = r.data.decode()
     report("(e) Cancel at confirm → END cancelled",
            b.startswith("END") and "cancel" in b.lower(), b[:80])
@@ -401,13 +405,13 @@ def run_all_tests(app):
 
     # ── (f) STORE_AND_WAIT guard on real rules ────────────────────────────────
     phone_f = TEST_PHONES[4]
-    td3 = _today_ddmmyyyy(3)
+    td3 = _today_offset(10)
     store_and_wait_without_pres = False
     ripeness_map = {"1": "GREEN", "2": "TURNING", "3": "RIPE"}
     for rip_code in ("1", "2", "3"):
         for stor_code in ("1", "2"):
             sid_f = f"SID_GUARD_{rip_code}_{stor_code}"
-            text_f = f"1*1*{td3}*500*{rip_code}*{stor_code}*1"
+            text_f = _full_text("1", td3, "500", rip_code, stor_code, "1")
             r_f = ussd_post(client, phone_f, text_f, session_id=sid_f)
             b_f = r_f.data.decode()
             if b_f.startswith("END"):
@@ -432,9 +436,9 @@ def run_all_tests(app):
     # ── (g) My submissions + My advice ───────────────────────────────────────
     # Submit 2 more for phone0 so we have multiple
     phone_g = TEST_PHONES[0]
-    for i, dt_offset in enumerate([4, 5]):
+    for i, dt_offset in enumerate([10, 15]):
         sid_gi = f"SID_G_{i}"
-        td_i = _today_ddmmyyyy(dt_offset)
+        td_i = _today_offset(dt_offset)
         ussd_post(client, phone_g, _full_text("1", td_i, "200", "1", "2", "1"), session_id=sid_gi)
         time.sleep(0.1)
 
@@ -462,7 +466,7 @@ def run_all_tests(app):
     # ── (h) Idempotency — same session+text posted twice ─────────────────────
     phone_h = TEST_PHONES[6]
     sid_h = "SID_IDMP"
-    td_h = _today_ddmmyyyy(6)
+    td_h = _today_offset(18)
     text_h = _full_text("1", td_h, "350", "3", "1", "1")
     _sms_calls.clear()
     session_store.clear_all()
@@ -556,7 +560,7 @@ def run_all_tests(app):
     # ── (j) SMS provider failure — recommendation committed, FAILED row ───────
     phone_j = TEST_PHONES[7]
     sid_j = "SID_J"
-    td_j = _today_ddmmyyyy(7)
+    td_j = _today_offset(22)
     _sms_should_fail = True
     _sms_calls.clear()
     r_j = ussd_post(client, phone_j, _full_text("1", td_j, "250", "3", "2", "1"), session_id=sid_j)
@@ -594,7 +598,7 @@ def run_all_tests(app):
     def _run_farmer(i: int) -> dict:
         phone = TEST_PHONES[i]
         sid = f"SID_CONC_{i:02d}"
-        td_k = _today_ddmmyyyy(8 + i)
+        td_k = _today_offset(10 + (i % 20))
         text_k = _full_text("1", td_k, str(100 + i * 10), "1", "2", "1")
 
         t0_flow = time.perf_counter()
@@ -672,7 +676,7 @@ def run_all_tests(app):
         "*****",
         "0",
         "1*0",
-        "2*1*99991399",
+        "2*1*13*9999",
     ]
     for gi in garbage_inputs:
         r = ussd_post(client, TEST_PHONES[0], gi, session_id=f"SID_GARB_{gi[:5]}")

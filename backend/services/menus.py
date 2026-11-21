@@ -1,137 +1,193 @@
 # REVIEW: Kinyarwanda needs a native speaker review before demo.
 """
-METLINK USSD Menus and Stateless Flow Engine.
+METLINK USSD Menus and Stateless Step Machine Engine.
 
-Implements a pure function handle(tokens, farmer) -> (kind, message)
-where kind is 'CON' or 'END'. All screen strings are in this module.
+Pure folding function handle(tokens, farmer) -> (kind, payload)
+Contract:
+- Left-to-right fold across tokens through a step machine.
+- Each token is stripped of whitespace.
+- Valid tokens advance step and push to history stack.
+- Invalid tokens do not change step or data; if last token, re-prompts screen with error prepended.
+- "0" after main menu pops stack (back one step), discarding data collected at that step.
+- "0" on language screen and main menu is an invalid choice (no back).
+- Single-step date entry (ENTER_DATE): validates full calendar date in Africa/Kigali timezone.
+- Screens fit <= 160 characters where practical, hard maximum 182.
 """
 
 from __future__ import annotations
 
+import logging
+import re
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
-from backend.services.engine import MAX_QUANTITY_KG, ALLOWED_MATURITY, MAX_DAYS_AHEAD
+from backend.services.engine import MAX_DAYS_AHEAD, MAX_QUANTITY_KG
 
-USSD_MAX_CHARS = 182  # Africa's Talking hard maximum
+logger = logging.getLogger(__name__)
 
-# ── Fit helper ──────────────────────────────────────────────────────────────
+KIGALI_TZ = ZoneInfo("Africa/Kigali")
+USSD_MAX_CHARS = 182
+
+# Steps
+STEP_LANG = "SELECT_LANG"
+STEP_MAIN = "MAIN_MENU"
+STEP_DATE = "ENTER_DATE"
+STEP_QTY = "ENTER_QUANTITY"
+STEP_MATURITY = "SELECT_MATURITY"
+STEP_STORAGE = "SELECT_STORAGE"
+STEP_CONFIRM = "CONFIRM_SUBMISSION"
+
+MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+_RIPENESS_MAP = {"1": "GREEN", "2": "TURNING", "3": "RIPE"}
+
+
+def get_today_kigali() -> date:
+    return datetime.now(KIGALI_TZ).date()
+
+
+def format_readable_date(d: date) -> str:
+    """Format a date as '25 Nov 2026'."""
+    return f"{d.day} {MONTH_NAMES[d.month - 1]} {d.year}"
+
+
+def parse_harvest_date(raw: str, today: Optional[date] = None) -> Tuple[Optional[date], Optional[str]]:
+    """
+    Parses and validates a raw harvest date string.
+    Rules:
+      - Strip whitespace.
+      - If separated (- / . space): exactly 3 parts: day (1-2 digits), month (1-2 digits), year (4 digits).
+      - If no separators: exactly 8 digits read as DDMMYYYY.
+      - Reject anything else as BAD_FORMAT.
+      - Check calendar validity (e.g. 31-02-2026, 29-02-2027) -> BAD_CALENDAR.
+      - Check past date (< today) -> PAST. (today is accepted).
+      - Check too far ahead (> today + MAX_DAYS_AHEAD) -> TOO_FAR.
+    Returns: (parsed_date, None) or (None, error_code).
+    """
+    if today is None:
+        today = get_today_kigali()
+
+    token = (raw or "").strip()
+    if not token:
+        return None, "BAD_FORMAT"
+
+    has_sep = any(c in token for c in "-/. ")
+    if has_sep:
+        parts = re.split(r"[-/.\s]+", token)
+        if len(parts) != 3:
+            return None, "BAD_FORMAT"
+        d_str, m_str, y_str = parts
+        if not (d_str.isdigit() and m_str.isdigit() and y_str.isdigit()):
+            return None, "BAD_FORMAT"
+        if not (1 <= len(d_str) <= 2 and 1 <= len(m_str) <= 2 and len(y_str) == 4):
+            return None, "BAD_FORMAT"
+        d_val, m_val, y_val = int(d_str), int(m_str), int(y_str)
+    else:
+        if not (token.isdigit() and len(token) == 8 and not token.startswith(("+", "-"))):
+            return None, "BAD_FORMAT"
+        d_val = int(token[0:2])
+        m_val = int(token[2:4])
+        y_val = int(token[4:8])
+
+    # Calendar validity
+    try:
+        candidate = date(y_val, m_val, d_val)
+    except ValueError:
+        return None, "BAD_CALENDAR"
+
+    # Past date check
+    if candidate < today:
+        return None, "PAST"
+
+    # Too far ahead
+    if candidate > today + timedelta(days=MAX_DAYS_AHEAD):
+        return None, "TOO_FAR"
+
+    return candidate, None
+
 
 def fit(text: str, budget: int) -> str:
-    """Truncate a dynamic value to `budget` characters, adding '…' if cut."""
+    """Truncate dynamic values to budget characters."""
     if len(text) <= budget:
         return text
     return text[: budget - 1] + "~"
 
 
-# ── Bilingual strings ────────────────────────────────────────────────────────
-
 def _t(lang: str, en: str, rw: str) -> str:
     return rw if lang == "rw" else en
 
 
-def screen_language() -> str:
-    return "METLINK\n1. English\n2. Kinyarwanda"
+# ── Screen Generators ─────────────────────────────────────────────────────────
+
+def screen_language(error: Optional[str] = None) -> str:
+    prompt = "METLINK\n1. English\n2. Kinyarwanda"
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
-def screen_invalid_language(lang: str) -> str:
-    return _t(lang,
-        "Invalid choice.\nMETLINK\n1. English\n2. Kinyarwanda",
-        "Hitamo nabi.\nMETLINK\n1. English\n2. Kinyarwanda",
-    )
-
-
-def screen_main(lang: str, name: str) -> str:
-    short = fit(name, 20)
-    return _t(lang,
-        f"Hello {short}\n1. Submit harvest\n2. My submissions\n3. My advice",
+def screen_main(lang: str, name: str, error: Optional[str] = None) -> str:
+    short = fit(name, 16)
+    prompt = _t(
+        lang,
+        f"Hello {short}\n1. Submit expected harvest\n2. My submissions\n3. My advice",
         f"Muraho {short}\n1. Ohereza umusaruro\n2. Ibyanjye\n3. Inama zanjye",
     )
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
-def screen_invalid_main(lang: str, name: str) -> str:
-    short = fit(name, 14)
-    return _t(lang,
-        f"Invalid. Hello {short}\n1. Submit harvest\n2. My submissions\n3. My advice",
-        f"Ntibishoboka. {short}\n1. Ohereza\n2. Ibyanjye\n3. Inama",
+# REVIEW: Kinyarwanda needs a native speaker review before demo.
+def screen_ask_date(lang: str, today: Optional[date] = None, error: Optional[str] = None) -> str:
+    if today is None:
+        today = get_today_kigali()
+    ex_date = today + timedelta(days=30)
+    example = ex_date.strftime("%d-%m-%Y")
+    prompt = _t(
+        lang,
+        f"Enter harvest date (DD-MM-YYYY or DDMMYYYY, e.g. {example}):\n0. Back",
+        f"Andika itariki yo gusarura (DD-MM-YYYY cyangwa DDMMYYYY, urugero: {example}):\n0. Subira inyuma",
     )
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
-def screen_ask_date(lang: str) -> str:
-    example = (date.today()).strftime("%d%m%Y")
-    return _t(lang,
-        f"Enter harvest date (DDMMYYYY)\neg: {example}\n0. Back",
-        f"Injiza itariki y'isarura (DDMMYYYY)\nns: {example}\n0. Subira",
+def screen_ask_quantity(lang: str, harvest_date: Optional[date] = None, error: Optional[str] = None) -> str:
+    header = f"Date: {format_readable_date(harvest_date)}\n" if harvest_date else ""
+    prompt = _t(
+        lang,
+        f"{header}Quantity in kg (whole number):\n0. Back",
+        f"{header}Ingano muri kg (umubare wuzuye):\n0. Subira",
     )
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
-def screen_bad_date(lang: str, reason: str) -> str:
-    example = date.today().strftime("%d%m%Y")
-    return _t(lang,
-        f"{reason}\nDate (DDMMYYYY) eg: {example}\n0. Back",
-        f"{reason}\nItariki (DDMMYYYY) ns: {example}\n0. Subira",
-    )
-
-
-def screen_ask_quantity(lang: str) -> str:
-    return _t(lang,
-        "Quantity in kg (whole number)\neg: 500\n0. Back",
-        "Ingano muri kg (umubare wuzuye)\nns: 500\n0. Subira",
-    )
-
-
-def screen_bad_quantity(lang: str, reason: str) -> str:
-    return _t(lang,
-        f"{reason}\nQuantity in kg (whole number)\n0. Back",
-        f"{reason}\nIngano muri kg\n0. Subira",
-    )
-
-
-def screen_ask_ripeness(lang: str) -> str:
-    return _t(lang,
+def screen_ask_maturity(lang: str, error: Optional[str] = None) -> str:
+    prompt = _t(
+        lang,
         "Tomato ripeness:\n1. Green\n2. Turning\n3. Ripe\n0. Back",
         "Ibara ry'inyanya:\n1. Ntimera\n2. Rinda\n3. Imeze\n0. Subira",
     )
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
-def screen_bad_ripeness(lang: str) -> str:
-    return _t(lang,
-        "Invalid. Ripeness:\n1. Green\n2. Turning\n3. Ripe\n0. Back",
-        "Ntibishoboka:\n1. Ntimera\n2. Rinda\n3. Imeze\n0. Subira",
+def screen_ask_storage(lang: str, error: Optional[str] = None) -> str:
+    prompt = _t(
+        lang,
+        "Do you have a safe place to store tomatoes (cool, ventilated)?\n1. Yes\n2. No\n0. Back",
+        "Ufite aho kubika inyanya hizewe (ahakonje, hahumeka)?\n1. Yego\n2. Oya\n0. Subira",
     )
-
-
-def screen_ask_storage(lang: str) -> str:
-    return _t(lang,
-        "Safe storage available?\n(Cool, ventilated place)\n1. Yes\n2. No\n0. Back",
-        "Ufite aho ubika?\n(Ahantu hateye ubushyuhe nkeya)\n1. Yego\n2. Oya\n0. Subira",
-    )
-
-
-def screen_bad_storage(lang: str) -> str:
-    return _t(lang,
-        "Invalid. Storage available?\n1. Yes\n2. No\n0. Back",
-        "Ntibishoboka. Ufite aho ubika?\n1. Yego\n2. Oya\n0. Subira",
-    )
-
-
-def _maturity_label(lang: str, mat: str) -> str:
-    labels = {
-        "GREEN":   _t(lang, "Green",   "Ntimera"),
-        "TURNING": _t(lang, "Turning", "Rinda"),
-        "RIPE":    _t(lang, "Ripe",    "Imeze"),
-    }
-    return labels.get(mat, mat)
-
-
-def _action_label(lang: str, action: str, days: Optional[int]) -> str:
-    if action == "SELL_NOW":
-        return _t(lang, "Sell now", "Gurisha ubu")
-    if action == "STORE_AND_WAIT":
-        d = days or 0
-        return _t(lang, f"Store {d}d", f"Bika {d}d")
-    return _t(lang, "Alt market", "Soko rindi")
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
 def screen_confirm(
@@ -140,20 +196,33 @@ def screen_confirm(
     quantity_kg: Decimal,
     maturity: str,
     has_storage: bool,
+    error: Optional[str] = None,
 ) -> str:
-    date_str = harvest_date.strftime("%d/%m/%Y")
-    mat = _maturity_label(lang, maturity)
-    stor = _t(lang, "Yes" if has_storage else "No", "Yego" if has_storage else "Oya")
-    return _t(lang,
-        f"Confirm:\nDate: {date_str}\nQty: {int(quantity_kg)}kg\n"
-        f"Type: {mat}\nStorage: {stor}\n1. Confirm\n2. Cancel",
-        f"Emeza:\nItariki: {date_str}\nIngano: {int(quantity_kg)}kg\n"
-        f"Ubwoko: {mat}\nAho kubika: {stor}\n1. Emeza\n2. Hagarika",
+    d_str = format_readable_date(harvest_date)
+    mat_lbl = {
+        "GREEN": _t(lang, "Green", "Ntimera"),
+        "TURNING": _t(lang, "Turning", "Rinda"),
+        "RIPE": _t(lang, "Ripe", "Imeze"),
+    }.get(maturity, maturity)
+    stor_lbl = _t(lang, "Yes" if has_storage else "No", "Yego" if has_storage else "Oya")
+
+    prompt = _t(
+        lang,
+        f"Confirm harvest:\nDate: {d_str}\nQty: {int(quantity_kg)}kg\n"
+        f"Maturity: {mat_lbl}\nStorage: {stor_lbl}\n"
+        f"1. Confirm & Submit\n2. Cancel\n0. Back",
+        f"Emeza umusaruro:\nItariki: {d_str}\nIbiro: {int(quantity_kg)}kg\n"
+        f"Ibyiciro: {mat_lbl}\nUbubiko: {stor_lbl}\n"
+        f"1. Emeza wohereze\n2. Hagarika\n0. Subira",
     )
+    if error:
+        return f"{error}\n{prompt}"
+    return prompt
 
 
 def screen_cancelled(lang: str) -> str:
-    return _t(lang,
+    return _t(
+        lang,
         "Cancelled. Nothing was saved.",
         "Byahagaritswe. Nta kintu cyabitswe.",
     )
@@ -166,7 +235,14 @@ def screen_result(
     best_market_name: Optional[str],
     best_market_price: Optional[Any],
 ) -> str:
-    action_lbl = _action_label(lang, action, waiting_period_days)
+    if action == "SELL_NOW":
+        action_lbl = _t(lang, "Sell now", "Gurisha ubu")
+    elif action == "STORE_AND_WAIT":
+        d = waiting_period_days or 0
+        action_lbl = _t(lang, f"Store {d}d", f"Bika {d}d")
+    else:
+        action_lbl = _t(lang, "Alt market", "Soko rindi")
+
     if best_market_name and best_market_price is not None:
         mkt = fit(str(best_market_name), 14)
         try:
@@ -176,8 +252,10 @@ def screen_result(
         market_part = f"\n{_t(lang, 'Market', 'Isoko')}: {mkt} {price_fmt}RWF"
     else:
         market_part = ""
+
     guide = _t(lang, "Details by SMS. Guide only.", "Soma SMS. Inama gusa.")
-    return _t(lang,
+    return _t(
+        lang,
         f"Advice: {action_lbl}{market_part}\n{guide}",
         f"Inama: {action_lbl}{market_part}\n{guide}",
     )
@@ -190,7 +268,11 @@ def screen_submissions(lang: str, rows: list) -> str:
     for r in rows:
         d = r["expected_harvest_date"]
         date_str = d.strftime("%d/%m") if hasattr(d, "strftime") else str(d)[:5]
-        mat = _maturity_label(lang, r["tomato_maturity"])
+        mat = {
+            "GREEN": _t(lang, "Green", "Ntimera"),
+            "TURNING": _t(lang, "Turning", "Rinda"),
+            "RIPE": _t(lang, "Ripe", "Imeze"),
+        }.get(r["tomato_maturity"], r["tomato_maturity"])
         qty = int(r["quantity_kg"])
         lines.append(f"{date_str} {qty}kg {mat}")
     return "\n".join(lines)
@@ -203,8 +285,14 @@ def screen_advice(lang: str, rows: list) -> str:
     for r in rows:
         d = r["expected_harvest_date"]
         date_str = d.strftime("%d/%m") if hasattr(d, "strftime") else str(d)[:5]
-        act = _action_label(lang, r["action"], r.get("waiting_period_days"))
-        lines.append(f"{date_str} {act}")
+        act = r["action"]
+        if act == "SELL_NOW":
+            act_lbl = _t(lang, "Sell now", "Gurisha ubu")
+        elif act == "STORE_AND_WAIT":
+            act_lbl = _t(lang, f"Store {r.get('waiting_period_days') or 0}d", f"Bika {r.get('waiting_period_days') or 0}d")
+        else:
+            act_lbl = _t(lang, "Alt market", "Soko rindi")
+        lines.append(f"{date_str} {act_lbl}")
     return "\n".join(lines)
 
 
@@ -214,10 +302,8 @@ def screen_service_error() -> str:
 
 def screen_not_registered() -> str:
     return (
-        "This number is not registered. "
-        "Contact your field administrator. / "
-        "Iyi nimero ntiyanditswe. "
-        "Vugana n'umukozi ugufasha kwandikisha."
+        "This number is not registered. Contact your administrator. / "
+        "Iyi nimero ntiyanditswe. Vugana n'umuyobozi."
     )
 
 
@@ -228,171 +314,194 @@ def screen_inactive() -> str:
     )
 
 
-# ── Date parsing helper ──────────────────────────────────────────────────────
+# ── Step Machine Folding ──────────────────────────────────────────────────────
 
-def parse_ddmmyyyy(raw: str) -> Tuple[Optional[date], Optional[str]]:
+def _is_strictly_digits(s: str) -> bool:
+    return bool(s) and s.isdigit() and not s.startswith(("+", "-", " "))
+
+
+def handle(tokens: List[str], farmer: Dict[str, Any]) -> Tuple[str, Any]:
     """
-    Parse DDMMYYYY string. Returns (date, None) or (None, error_msg).
+    Folds tokens left-to-right through the step machine.
+
+    Returns:
+      ("CON", screen_text)
+      ("END", screen_text)
+      ("NEED_SUBMISSIONS", lang)
+      ("NEED_ADVICE", lang)
+      ("DO_SUBMIT", (lang, harvest_date, quantity_kg, maturity, has_storage))
     """
-    raw = raw.strip()
-    if not raw.isdigit() or len(raw) != 8:
-        return None, "Format: DDMMYYYY (8 digits)."
-    try:
-        d = datetime.strptime(raw, "%d%m%Y").date()
-    except ValueError:
-        return None, "Invalid calendar date."
-    return d, None
-
-
-# ── MATURITY MAP ─────────────────────────────────────────────────────────────
-
-_RIPENESS_MAP = {"1": "GREEN", "2": "TURNING", "3": "RIPE"}
-
-# ── Pure stateless flow ──────────────────────────────────────────────────────
-
-def handle(tokens: List[str], farmer: Dict[str, Any]) -> Tuple[str, str]:
-    """
-    Stateless USSD flow engine.
-
-    tokens  = text.split("*") if text else []
-    farmer  = dict from get_farmer_by_phone, with 'preferred_language' set.
-
-    Returns (kind, message) where kind is 'CON' or 'END'.
-
-    Token positions:
-      [0]  language choice (1=en, 2=rw)
-      [1]  main menu choice (1=submit, 2=submissions, 3=advice)
-      [2]  date DDMMYYYY         (submit step 1)
-      [3]  quantity kg            (submit step 2)
-      [4]  ripeness (1/2/3)      (submit step 3)
-      [5]  storage (1/2)         (submit step 4)
-      [6]  confirm (1/2)         (submit step 5)
-
-    '0' at any depth goes back one level (reduces token depth by 1).
-    """
+    farmer_name = farmer.get("name", "Farmer")
     lang = farmer.get("preferred_language", "en")
 
-    # ── Screen 0: language not yet chosen ────────────────────────────────────
-    if not tokens or tokens[0] == "":
-        return "CON", screen_language()
+    # Initial machine state
+    current_step = STEP_LANG
+    stack: List[Tuple[str, Dict[str, Any]]] = []
+    data: Dict[str, Any] = {"lang": lang}
+    last_error: Optional[str] = None
 
-    t0 = tokens[0].strip()
+    # Filter/clean tokens
+    clean_tokens = [t.strip() for t in tokens] if tokens else []
+    num_tokens = len(clean_tokens)
 
-    # ── Screen 1: language selection ─────────────────────────────────────────
-    if t0 == "1":
-        lang = "en"
-    elif t0 == "2":
-        lang = "rw"
-    else:
-        return "CON", screen_invalid_language(lang)
+    for i, token in enumerate(clean_tokens):
+        is_last = (i == num_tokens - 1)
 
-    # ── Screen 2: main menu ───────────────────────────────────────────────────
-    if len(tokens) == 1:
-        return "CON", screen_main(lang, farmer["name"])
+        # ── Handle Back ("0") ────────────────────────────────────────────────
+        if token == "0":
+            if current_step in (STEP_LANG, STEP_MAIN):
+                # No back from language selection or main menu
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
+                continue
+            else:
+                # Pop previous state
+                if stack:
+                    prev_step, prev_data = stack.pop()
+                    current_step = prev_step
+                    data = prev_data.copy()
+                    lang = data.get("lang", lang)
+                if is_last:
+                    last_error = None
+                continue
 
-    t1 = tokens[1].strip()
+        # ── Step-Specific Token Processing ───────────────────────────────────
+        if current_step == STEP_LANG:
+            if token in ("1", "2"):
+                stack.append((current_step, data.copy()))
+                lang = "en" if token == "1" else "rw"
+                data["lang"] = lang
+                current_step = STEP_MAIN
+                if is_last:
+                    last_error = None
+            else:
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
 
-    if t1 == "0":
-        return "CON", screen_language()
+        elif current_step == STEP_MAIN:
+            if token == "1":
+                stack.append((current_step, data.copy()))
+                current_step = STEP_DATE
+                if is_last:
+                    last_error = None
+            elif token == "2":
+                return "NEED_SUBMISSIONS", lang
+            elif token == "3":
+                return "NEED_ADVICE", lang
+            else:
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
 
-    if t1 == "2":
-        # My submissions — leaf node, returned by caller using DB
-        return "NEED_SUBMISSIONS", lang  # type: ignore[return-value]
+        elif current_step == STEP_DATE:
+            cand_date, err_code = parse_harvest_date(token, get_today_kigali())
+            if cand_date is not None:
+                stack.append((current_step, data.copy()))
+                data["harvest_date"] = cand_date
+                current_step = STEP_QTY
+                if is_last:
+                    last_error = None
+            else:
+                if is_last:
+                    if err_code == "BAD_CALENDAR":
+                        last_error = _t(lang, "That date does not exist.", "Iyo tariki ntibaho.")
+                    elif err_code == "PAST":
+                        last_error = _t(lang, "That date is in the past.", "Iyo tariki yararenze.")
+                    elif err_code == "TOO_FAR":
+                        last_error = _t(lang, "Date is too far ahead.", "Iyo tariki iri kure cyane.")
+                    else:  # BAD_FORMAT
+                        last_error = _t(lang, "Invalid date. Use DD-MM-YYYY.", "Itariki siyo. Koresha DD-MM-YYYY.")
 
-    if t1 == "3":
-        # My advice — leaf node, returned by caller using DB
-        return "NEED_ADVICE", lang  # type: ignore[return-value]
+        elif current_step == STEP_QTY:
+            if _is_strictly_digits(token):
+                q_val = int(token)
+                if 1 <= q_val <= int(MAX_QUANTITY_KG):
+                    stack.append((current_step, data.copy()))
+                    data["quantity_kg"] = Decimal(q_val)
+                    current_step = STEP_MATURITY
+                    if is_last:
+                        last_error = None
+                else:
+                    if is_last:
+                        last_error = _t(
+                            lang,
+                            f"Enter quantity (1-{int(MAX_QUANTITY_KG):,}kg).",
+                            f"Injiza ingano (1-{int(MAX_QUANTITY_KG):,}kg).",
+                        )
+            else:
+                if is_last:
+                    last_error = _t(
+                        lang,
+                        f"Enter quantity (1-{int(MAX_QUANTITY_KG):,}kg).",
+                        f"Injiza ingano (1-{int(MAX_QUANTITY_KG):,}kg).",
+                    )
 
-    if t1 != "1":
-        return "CON", screen_invalid_main(lang, farmer["name"])
+        elif current_step == STEP_MATURITY:
+            mat = _RIPENESS_MAP.get(token)
+            if mat:
+                stack.append((current_step, data.copy()))
+                data["maturity"] = mat
+                current_step = STEP_STORAGE
+                if is_last:
+                    last_error = None
+            else:
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
 
-    # ── Submit harvest flow ────────────────────────────────────────────────────
-    # Step 1 – date
-    if len(tokens) == 2:
-        return "CON", screen_ask_date(lang)
+        elif current_step == STEP_STORAGE:
+            if token in ("1", "2"):
+                stack.append((current_step, data.copy()))
+                data["has_storage"] = (token == "1")
+                current_step = STEP_CONFIRM
+                if is_last:
+                    last_error = None
+            else:
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
 
-    t2 = tokens[2].strip()
-    if t2 == "0":
-        return "CON", screen_main(lang, farmer["name"])
+        elif current_step == STEP_CONFIRM:
+            if token == "1":
+                # Final confirmation choice
+                return "DO_SUBMIT", (
+                    lang,
+                    data["harvest_date"],
+                    data["quantity_kg"],
+                    data["maturity"],
+                    data["has_storage"],
+                )
+            elif token == "2":
+                return "END", screen_cancelled(lang)
+            else:
+                if is_last:
+                    last_error = _t(lang, "Invalid choice. Please try again.", "Wahisemo nabi. Ongera ugerageze.")
 
-    parsed_date, date_err = parse_ddmmyyyy(t2)
-    if date_err:
-        return "CON", screen_bad_date(lang, date_err)
+    # ── Render Current Screen ────────────────────────────────────────────────
+    if current_step == STEP_LANG:
+        return "CON", screen_language(last_error)
 
-    # Date must be today or later (past check deferred so test date shifts don't break nav)
-    if parsed_date < date.today():
-        return "CON", screen_bad_date(lang, _t(lang, "Date is in the past.", "Itariki irashize."))
+    if current_step == STEP_MAIN:
+        return "CON", screen_main(lang, farmer_name, last_error)
 
-    if parsed_date > date.today() + timedelta(days=MAX_DAYS_AHEAD):
-        return "CON", screen_bad_date(
+    if current_step == STEP_DATE:
+        return "CON", screen_ask_date(lang, get_today_kigali(), last_error)
+
+    if current_step == STEP_QTY:
+        return "CON", screen_ask_quantity(lang, data.get("harvest_date"), last_error)
+
+    if current_step == STEP_MATURITY:
+        return "CON", screen_ask_maturity(lang, last_error)
+
+    if current_step == STEP_STORAGE:
+        return "CON", screen_ask_storage(lang, last_error)
+
+    if current_step == STEP_CONFIRM:
+        return "CON", screen_confirm(
             lang,
-            _t(lang, f"Date too far (max {MAX_DAYS_AHEAD}d).", f"Itariki ni kure cyane (max {MAX_DAYS_AHEAD}d)."),
+            data["harvest_date"],
+            data["quantity_kg"],
+            data["maturity"],
+            data["has_storage"],
+            last_error,
         )
 
-    # Step 2 – quantity
-    if len(tokens) == 3:
-        return "CON", screen_ask_quantity(lang)
+    return "END", screen_service_error()
 
-    t3 = tokens[3].strip()
-    if t3 == "0":
-        return "CON", screen_ask_date(lang)
-
-    try:
-        qty_raw = int(t3)
-    except ValueError:
-        return "CON", screen_bad_quantity(lang, _t(lang, "Enter a whole number.", "Injiza umubare wuzuye."))
-
-    if qty_raw <= 0:
-        return "CON", screen_bad_quantity(lang, _t(lang, "Must be > 0.", "Agomba kurenga 0."))
-
-    if qty_raw > int(MAX_QUANTITY_KG):
-        return "CON", screen_bad_quantity(
-            lang,
-            _t(lang, f"Max {int(MAX_QUANTITY_KG):,}kg.", f"Max {int(MAX_QUANTITY_KG):,}kg."),
-        )
-
-    quantity_kg = Decimal(qty_raw)
-
-    # Step 3 – ripeness
-    if len(tokens) == 4:
-        return "CON", screen_ask_ripeness(lang)
-
-    t4 = tokens[4].strip()
-    if t4 == "0":
-        return "CON", screen_ask_quantity(lang)
-
-    maturity = _RIPENESS_MAP.get(t4)
-    if maturity is None:
-        return "CON", screen_bad_ripeness(lang)
-
-    # Step 4 – storage
-    if len(tokens) == 5:
-        return "CON", screen_ask_storage(lang)
-
-    t5 = tokens[5].strip()
-    if t5 == "0":
-        return "CON", screen_ask_ripeness(lang)
-
-    if t5 == "1":
-        has_storage = True
-    elif t5 == "2":
-        has_storage = False
-    else:
-        return "CON", screen_bad_storage(lang)
-
-    # Step 5 – confirm
-    if len(tokens) == 6:
-        return "CON", screen_confirm(lang, parsed_date, quantity_kg, maturity, has_storage)
-
-    t6 = tokens[6].strip()
-    if t6 == "0":
-        return "CON", screen_ask_storage(lang)
-
-    if t6 == "2":
-        return "END", screen_cancelled(lang)
-
-    if t6 != "1":
-        return "CON", screen_confirm(lang, parsed_date, quantity_kg, maturity, has_storage)
-
-    # Signal to route handler to run process_harvest
-    return "DO_SUBMIT", (lang, parsed_date, quantity_kg, maturity, has_storage)  # type: ignore[return-value]

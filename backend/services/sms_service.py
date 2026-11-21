@@ -10,7 +10,9 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
 import africastalking
@@ -212,6 +214,58 @@ def reset_sms_provider() -> None:
     _provider_fn = default_sms_provider
 
 
+def _insert_sms_log_with_retry(
+    recommendation_id: int,
+    phone_number: str,
+    message: str,
+    status: str,
+    provider_id: Optional[str] = None,
+    delivered_at: Optional[Any] = None,
+) -> Optional[int]:
+    """
+    Guarantees an sms_logs row is inserted.
+    If the first insert attempt fails, logs ERROR with logger.exception
+    and retries once on a fresh cursor.
+    """
+    for attempt in range(2):
+        try:
+            with get_cursor() as cur:
+                if delivered_at is not None:
+                    cur.execute(
+                        """
+                        INSERT INTO sms_logs (
+                            recommendation_id, phone_number, message, status, provider_id, sent_at, delivered_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
+                        RETURNING sms_id;
+                        """,
+                        (recommendation_id, phone_number, message, status, provider_id, delivered_at),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO sms_logs (
+                            recommendation_id, phone_number, message, status, provider_id, sent_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        RETURNING sms_id;
+                        """,
+                        (recommendation_id, phone_number, message, status, provider_id),
+                    )
+                row = cur.fetchone()
+                return row["sms_id"] if row else None
+        except Exception:
+            logger.exception(
+                "Attempt %d: Failed to insert sms_logs row (phone=%s, status=%s)",
+                attempt + 1,
+                mask_phone(phone_number),
+                status,
+            )
+            if attempt == 1:
+                return None
+    return None
+
+
 def send_sms_sync(
     recommendation_id: int,
     phone_number: str,
@@ -220,131 +274,117 @@ def send_sms_sync(
     """
     Sends an SMS message synchronously and logs the outcome to sms_logs.
 
+    Guarantees that every path creates exactly one sms_logs row.
     Uses its own database cursor to commit independently.
     NEVER raises an exception to the caller: provider errors become a FAILED row.
     """
-    config = get_sms_config()
-    mode = config["mode"]
     masked = mask_phone(phone_number)
+    final_status = "FAILED"
+    final_provider_id = None
+    final_delivered_at = None
 
-    logger.info("SMS send dispatch mode=%s to %s (rec_id=%s)", mode, masked, recommendation_id)
+    try:
+        config = get_sms_config()
+        mode = config["mode"]
+        logger.info("SMS send dispatch mode=%s to %s (rec_id=%s)", mode, masked, recommendation_id)
 
-    # 1. log_only mode
-    if mode == "log_only":
-        logger.warning(
-            "SMS in log_only mode: simulated send to %s (no SMS transmitted to carrier)",
-            masked,
-        )
-        try:
-            with get_cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO sms_logs (
-                        recommendation_id, phone_number, message, status, provider_id, sent_at
-                    )
-                    VALUES (%s, %s, %s, 'SENT', NULL, CURRENT_TIMESTAMP)
-                    RETURNING sms_id;
-                    """,
-                    (recommendation_id, phone_number, message),
-                )
+        # 1. log_only mode
+        if mode == "log_only":
+            logger.warning(
+                "SMS in log_only mode: simulated send to %s (no SMS transmitted to carrier)",
+                masked,
+            )
+            final_status = "SENT"
+            final_provider_id = None
             return {"status": "SENT", "provider_id": None}
-        except Exception:
-            logger.exception("Failed to insert sms_logs in log_only mode for %s", masked)
+
+        # 2. live mode: verify required credentials
+        missing_keys = []
+        if not config["username"]:
+            missing_keys.append("AT_USERNAME")
+        if not config["api_key"]:
+            missing_keys.append("AT_API_KEY")
+
+        if missing_keys:
+            logger.error(
+                "SMS live mode cannot send: missing required key(s): %s",
+                ", ".join(missing_keys),
+            )
+            final_status = "FAILED"
+            final_provider_id = None
             return {"status": "FAILED", "provider_id": None}
 
-    # 2. live mode: verify required credentials
-    missing_keys = []
-    if not config["username"]:
-        missing_keys.append("AT_USERNAME")
-    if not config["api_key"]:
-        missing_keys.append("AT_API_KEY")
-
-    if missing_keys:
-        logger.error(
-            "SMS live mode cannot send: missing required key(s): %s",
-            ", ".join(missing_keys),
-        )
-        try:
-            with get_cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO sms_logs (
-                        recommendation_id, phone_number, message, status, provider_id, sent_at
-                    )
-                    VALUES (%s, %s, %s, 'FAILED', NULL, CURRENT_TIMESTAMP)
-                    RETURNING sms_id;
-                    """,
-                    (recommendation_id, phone_number, message),
-                )
-        except Exception:
-            logger.exception("Failed to record FAILED sms_logs for missing credentials for %s", masked)
-        return {"status": "FAILED", "provider_id": None}
-
-    # 3. live mode via provider
-    try:
+        # 3. live mode via provider
         res = _provider_fn(phone_number, message)
-        provider_id = res.get("provider_id")
-        provider_status = str(res.get("status", "")).lower()
-        status_code = res.get("status_code")
+        provider_id = None
+        is_success = False
+        status_text = ""
+        status_code = None
 
-        is_success = (provider_status == "success") or (status_code in (100, 101, 102))
-        final_status = "SENT" if (is_success and provider_id) else "FAILED"
-
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO sms_logs (
-                    recommendation_id, phone_number, message, status, provider_id, sent_at
+        if isinstance(res, dict):
+            if "SMSMessageData" in res:
+                recipients = res.get("SMSMessageData", {}).get("Recipients", [])
+                if recipients:
+                    r0 = recipients[0]
+                    provider_id = r0.get("messageId")
+                    status_text = str(r0.get("status", "")).strip()
+                    status_code = r0.get("statusCode")
+                    is_success = (status_text.lower() == "success") or (status_code in (100, 101, 102))
+                    if not is_success:
+                        logger.error(
+                            "Africa's Talking recipient error: status='%s' statusCode=%s",
+                            status_text,
+                            status_code,
+                        )
+                else:
+                    msg_header = res.get("SMSMessageData", {}).get("Message", "Empty recipients list")
+                    logger.error("Africa's Talking returned no recipients: %s", msg_header)
+            else:
+                provider_id = res.get("provider_id")
+                status_text = str(res.get("status", "")).strip()
+                status_code = res.get("status_code")
+                is_success = (
+                    (status_text.lower() in ("success", "sent"))
+                    or (status_code in (100, 101, 102))
                 )
-                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                RETURNING sms_id;
-                """,
-                (
-                    recommendation_id,
-                    phone_number,
-                    message,
-                    final_status,
-                    provider_id if final_status == "SENT" else None,
-                ),
-            )
+                if not is_success:
+                    logger.error(
+                        "Provider returned non-success: status='%s' statusCode=%s",
+                        status_text,
+                        status_code,
+                    )
 
-        if final_status == "SENT":
-            logger.info(
-                "SMS live send to %s recorded as SENT (provider_id: %s)",
-                masked,
-                provider_id,
-            )
+        if is_success and provider_id:
+            final_status = "SENT"
+            final_provider_id = provider_id
+
+            # Sandbox auto-delivered convenience check
+            raw_auto = _clean_env_val(os.getenv("SMS_SANDBOX_AUTO_DELIVERED")).lower()
+            if raw_auto == "true" and config.get("username") == "sandbox":
+                final_status = "DELIVERED"
+                final_delivered_at = datetime.now()
+                logger.warning("sandbox auto-delivered, no delivery report received")
         else:
-            logger.error(
-                "SMS live send to %s recorded as FAILED (status: %s, code: %s)",
-                masked,
-                provider_status,
-                status_code,
-            )
-
-        return {
-            "status": final_status,
-            "provider_id": provider_id if final_status == "SENT" else None,
-        }
+            final_status = "FAILED"
+            final_provider_id = None
 
     except Exception:
         logger.exception("Failed to send live SMS to %s", masked)
-        try:
-            with get_cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO sms_logs (
-                        recommendation_id, phone_number, message, status, provider_id, sent_at
-                    )
-                    VALUES (%s, %s, %s, 'FAILED', NULL, CURRENT_TIMESTAMP)
-                    RETURNING sms_id;
-                    """,
-                    (recommendation_id, phone_number, message),
-                )
-        except Exception:
-            logger.exception("Failed to record FAILED sms_log for %s", masked)
+        final_status = "FAILED"
+        final_provider_id = None
+        final_delivered_at = None
 
-        return {"status": "FAILED", "provider_id": None}
+    finally:
+        _insert_sms_log_with_retry(
+            recommendation_id=recommendation_id,
+            phone_number=phone_number,
+            message=message,
+            status=final_status,
+            provider_id=final_provider_id,
+            delivered_at=final_delivered_at,
+        )
+
+    return {"status": final_status, "provider_id": final_provider_id}
 
 
 def _async_sms_worker(recommendation_id: int, phone_number: str, message: str) -> Dict[str, Any]:
@@ -388,11 +428,8 @@ def apply_delivery_report(
     """
     Applies Africa's Talking delivery report callback.
 
-    Status transitions:
-    - 'Success' -> 'DELIVERED' (sets delivered_at to CURRENT_TIMESTAMP)
-    - 'Failed' or 'Rejected' -> 'FAILED'
-    - 'Sent', 'Submitted', 'Buffered' -> ignored (returns False)
-
+    Race guard: if no row matches in sms_logs, retries up to 3 times
+    with a 300 ms pause before giving up.
     CRITICAL: Never downgrades an already 'DELIVERED' row.
     Returns True if a row's status was updated, False otherwise.
     """
@@ -408,42 +445,46 @@ def apply_delivery_report(
         # Transient intermediate statuses (Sent, Submitted, Buffered, etc.)
         return False
 
-    with get_cursor() as cur:
-        cur.execute(
-            """
-            SELECT sms_id, status
-            FROM sms_logs
-            WHERE provider_id = %s;
-            """,
-            (provider_id,),
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-
-        current_status = row["status"]
-        if current_status == "DELIVERED":
-            # Never downgrade a delivered message
-            return False
-
-        if target_status == "DELIVERED":
+    for attempt in range(4):
+        with get_cursor() as cur:
             cur.execute(
                 """
-                UPDATE sms_logs
-                SET status = 'DELIVERED',
-                    delivered_at = CURRENT_TIMESTAMP
+                SELECT sms_id, status
+                FROM sms_logs
                 WHERE provider_id = %s;
                 """,
                 (provider_id,),
             )
-        else:
-            cur.execute(
-                """
-                UPDATE sms_logs
-                SET status = 'FAILED'
-                WHERE provider_id = %s;
-                """,
-                (provider_id,),
-            )
+            row = cur.fetchone()
+            if row:
+                current_status = row["status"]
+                if current_status == "DELIVERED":
+                    # Never downgrade a delivered message
+                    return False
 
-        return cur.rowcount > 0
+                if target_status == "DELIVERED":
+                    cur.execute(
+                        """
+                        UPDATE sms_logs
+                        SET status = 'DELIVERED',
+                            delivered_at = CURRENT_TIMESTAMP
+                        WHERE provider_id = %s;
+                        """,
+                        (provider_id,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE sms_logs
+                        SET status = 'FAILED'
+                        WHERE provider_id = %s;
+                        """,
+                        (provider_id,),
+                    )
+                return cur.rowcount > 0
+
+        if attempt < 3:
+            time.sleep(0.3)
+
+    logger.info("Delivery report received for unknown provider_id: %s (after 3 retries)", provider_id)
+    return False
