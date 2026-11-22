@@ -308,7 +308,16 @@ function createSmsRow(sms, query) {
   tdTime.textContent = formatDateTime(sms.sent_at);
   tr.appendChild(tdTime);
 
-  // 2. Recipient (phone + farmer name)
+  // 2. Provider ID (truncated with full value in title attribute, '-' when empty)
+  const tdProvider = document.createElement('td');
+  tdProvider.className = 'desc-cell';
+  tdProvider.title = sms.provider_id || '';
+  const fullProv = sms.provider_id || '-';
+  const dispProv = fullProv.length > 16 ? `${fullProv.slice(0, 16)}...` : fullProv;
+  highlightInto(tdProvider, dispProv, query);
+  tr.appendChild(tdProvider);
+
+  // 3. Recipient (phone + farmer name)
   const tdRecip = document.createElement('td');
   const phoneDiv = document.createElement('div');
   phoneDiv.style.fontWeight = '600';
@@ -447,7 +456,8 @@ function getFilteredData(tabName) {
       const name = (item.farmer_name || '').toLowerCase();
       const msg = (item.message || '').toLowerCase();
       const st = (item.status || '').toLowerCase();
-      return phone.includes(query) || name.includes(query) || msg.includes(query) || st.includes(query);
+      const prov = (item.provider_id || '').toLowerCase();
+      return phone.includes(query) || name.includes(query) || msg.includes(query) || st.includes(query) || prov.includes(query);
     });
   }
 

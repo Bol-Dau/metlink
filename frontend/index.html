@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METLINK — Decision Support for Kamonyi Tomato Farmers</title>
+  <meta name="description" content="METLINK helps Kamonyi tomato growers reduce post-harvest spoilage and time sales to Kigali wholesale markets using simple USSD and SMS phone advice.">
+
+  <!-- Load Order: theme.css, then landing.css -->
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/landing.css">
+</head>
+<body class="lp-body">
+  <!-- Accessibility: Skip to Main Content Link -->
+  <a href="#main-content" class="lp-skip-link">Skip to main content</a>
+
+  <!-- A. NAVBAR -->
+  <header class="lp-navbar" id="lpNavbar">
+    <div class="lp-container lp-nav-inner">
+      <!-- Brand Logo -->
+      <a href="#home" class="lp-brand" aria-label="METLINK Homepage">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="13" r="8.5" fill="#d63031"/>
+          <path d="M12 4.5 C11.5 2.5, 12.5 1.5, 13 1 C13.5 1.5, 14 2.5, 13.5 4.5" stroke="#27ae60" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M10 5 C8.5 3.8, 7.8 4.2, 7.5 4.5 C8.5 5.5, 9.5 5.5, 10.5 5.3" stroke="#27ae60" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M14 5 C15.5 3.8, 16.2 4.2, 16.5 4.5 C15.5 5.5, 14.5 5.5, 13.5 5.3" stroke="#27ae60" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>METLINK</span>
+      </a>
+
+      <!-- Desktop & Mobile Navigation Links -->
+      <nav aria-label="Main Navigation">
+        <ul class="lp-nav-menu" id="lpNavMenu">
+          <li><a href="#home" class="lp-nav-link lp-active">Home</a></li>
+          <li><a href="#problem" class="lp-nav-link">The Problem</a></li>
+          <li><a href="#how-it-works" class="lp-nav-link">How It Works</a></li>
+          <li><a href="#features" class="lp-nav-link">Features</a></li>
+          <li><a href="#market-insights" class="lp-nav-link">Market Insights</a></li>
+          <li><a href="#platform-preview" class="lp-nav-link">Platform Preview</a></li>
+          <li><a href="#contact" class="lp-nav-link">Pilot / Contact</a></li>
+          <li class="lp-mobile-admin-wrap">
+            <a href="login.html" class="btn btn-outline btn-sm">Admin Portal</a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Desktop Action & Hamburger Toggle -->
+      <div class="lp-nav-actions">
+        <a href="login.html" class="btn btn-outline btn-sm lp-desktop-admin-btn">Admin Portal</a>
+        <button type="button" class="lp-hamburger" id="lpHamburger" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="lpNavMenu">
+          <span class="lp-hamburger-bar"></span>
+          <span class="lp-hamburger-bar"></span>
+          <span class="lp-hamburger-bar"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main id="main-content">
+    <!-- B. HERO CAROUSEL (#home) -->
+    <header class="lp-hero-section lp-section-target" id="home">
+      <!-- Full-bleed background carousel -->
+      <div class="lp-carousel-container" id="lpHeroCarousel" aria-hidden="true">
+        <!-- Slide 1 (Eager load) -->
+        <div class="lp-carousel-slide lp-slide-active">
+          <img src="images/hero-1.jpg" alt="Fresh ripe red tomatoes ready for market dispatch" class="lp-carousel-img" loading="eager" width="1600" height="1000">
+        </div>
+        <!-- Slide 2 (Lazy load) -->
+        <div class="lp-carousel-slide">
+          <img src="images/hero-2.jpg" alt="Tomato farmers sorting freshly picked produce at harvest" class="lp-carousel-img" loading="lazy" width="1600" height="1000">
+        </div>
+        <!-- Slide 3 (Lazy load) -->
+        <div class="lp-carousel-slide">
+          <img src="images/hero-3.jpg" alt="Tomato crops ripening on the vine inside an agricultural greenhouse" class="lp-carousel-img" loading="lazy" width="1600" height="1000">
+        </div>
+        <!-- Slide 4 (Lazy load) -->
+        <div class="lp-carousel-slide">
+          <img src="images/hero-4.jpg" alt="Organic tomatoes growing in agricultural fields" class="lp-carousel-img" loading="lazy" width="1600" height="900">
+        </div>
+        <!-- Slide 5 (Lazy load) -->
+        <div class="lp-carousel-slide">
+          <img src="images/hero-5.jpg" alt="Vibrant fresh produce displayed at a wholesale market stall" class="lp-carousel-img" loading="lazy" width="1600" height="1072">
+        </div>
+      </div>
+
+      <!-- Contrast Overlay -->
+      <div class="lp-carousel-overlay" aria-hidden="true"></div>
+
+      <!-- Hero Content -->
+      <div class="lp-container lp-hero-content">
+        <div class="lp-hero-inner">
+          <div class="lp-hero-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Kamonyi Tomato Farmers &bull; Kigali Wholesale Markets</span>
+          </div>
+
+          <h1 class="lp-hero-title">Empowering Kamonyi Tomato Growers to Reduce Spoilage and Maximize Value</h1>
+          <p class="lp-hero-subtitle">METLINK helps Kamonyi tomato growers reduce post-harvest spoilage and time their sales to Kigali markets using simple phone advice.</p>
+
+          <div class="lp-hero-cta-group">
+            <a href="#how-it-works" class="btn btn-primary">See How USSD Works</a>
+            <a href="#market-insights" class="btn btn-outline" style="color: #ffffff; border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08);">View Live Market Prices</a>
+          </div>
+
+          <p class="lp-hero-notice">Farmers use METLINK on any basic phone through USSD and SMS after a field administrator registers them. There is no public sign-up.</p>
+        </div>
+      </div>
+
+      <!-- Carousel Dot Indicators -->
+      <div class="lp-carousel-dots" role="group" aria-label="Hero carousel slide controls">
+        <button type="button" class="lp-carousel-dot" aria-label="Show slide 1" aria-current="true"></button>
+        <button type="button" class="lp-carousel-dot" aria-label="Show slide 2"></button>
+        <button type="button" class="lp-carousel-dot" aria-label="Show slide 3"></button>
+        <button type="button" class="lp-carousel-dot" aria-label="Show slide 4"></button>
+        <button type="button" class="lp-carousel-dot" aria-label="Show slide 5"></button>
+      </div>
+
+      <!-- Seamless Curved Wave Transition into #problem -->
+      <div class="lp-wave-divider" aria-hidden="true">
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+          <path d="M0,0 C300,90 900,90 1200,0 L1200,120 L0,120 Z" fill="#ffffff"></path>
+        </svg>
+      </div>
+    </header>
+
+    <!-- C. THE PROBLEM (#problem) -->
+    <section class="lp-problem-section lp-section-target" id="problem" aria-labelledby="problem-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">Agricultural Challenge</span>
+          <h2 class="lp-section-title" id="problem-heading">Why Timing and Market Visibility Matter</h2>
+          <p class="lp-section-desc">Fresh tomatoes spoil quickly under tropical temperatures. Without transparent market information, farmers face steep losses.</p>
+        </div>
+
+        <div class="lp-problem-grid">
+          <!-- Left: Narrative -->
+          <div class="lp-problem-narrative">
+            <p>Tomatoes are highly perishable crops. Once harvested, their shelf-life shortens dramatically depending on maturity and storage conditions. In Kamonyi district, smallholders often harvest without knowing current wholesale conditions in Kigali, risking distress sales or product rotting before reaching a buyer.</p>
+            <p>Wholesale prices fluctuate significantly between Kigali markets such as Nyabugogo, Kimironko, Kicukiro, and Remera. A surplus at one depot can drive prices down on the same morning that another market faces shortages.</p>
+            <p>Most smallholder farmers rely on basic 2G feature phones without mobile internet. Without real-time access to official market intelligence, they depend on intermediaries and cannot verify whether holding their crop for two days or selling immediately is the safer economic decision.</p>
+          </div>
+
+          <!-- Right: 3 Metric Cards with Animated SVG Rings -->
+          <div class="lp-metric-cards-col">
+            <!-- Metric 1: 3 Ripeness Stages -->
+            <div class="lp-metric-card" data-ring-percent="100">
+              <div class="lp-ring-wrap lp-ring-1" aria-hidden="true">
+                <svg class="lp-ring-svg" viewBox="0 0 88 88">
+                  <circle class="lp-ring-bg" cx="44" cy="44" r="40"/>
+                  <circle class="lp-ring-fill" cx="44" cy="44" r="40"/>
+                </svg>
+                <span class="lp-ring-val">3</span>
+              </div>
+              <div class="lp-metric-text">
+                <h3>Ripeness Stages Evaluated</h3>
+                <p>Green, Turning, and Ripe: ripeness determines shelf-life and how long a harvest can safely wait before rotting.</p>
+              </div>
+            </div>
+
+            <!-- Metric 2: 0 Internet Needed -->
+            <div class="lp-metric-card" data-ring-percent="100">
+              <div class="lp-ring-wrap lp-ring-2" aria-hidden="true">
+                <svg class="lp-ring-svg" viewBox="0 0 88 88">
+                  <circle class="lp-ring-bg" cx="44" cy="44" r="40"/>
+                  <circle class="lp-ring-fill" cx="44" cy="44" r="40"/>
+                </svg>
+                <span class="lp-ring-val">0</span>
+              </div>
+              <div class="lp-metric-text">
+                <h3>Mobile Internet Required</h3>
+                <p>100% accessible over standard USSD shortcodes and SMS delivery on basic button phones.</p>
+              </div>
+            </div>
+
+            <!-- Metric 3: Live Count of Markets Compared -->
+            <div class="lp-metric-card" data-ring-percent="85">
+              <div class="lp-ring-wrap lp-ring-3" aria-hidden="true">
+                <svg class="lp-ring-svg" viewBox="0 0 88 88">
+                  <circle class="lp-ring-bg" cx="44" cy="44" r="40"/>
+                  <circle class="lp-ring-fill" cx="44" cy="44" r="40"/>
+                </svg>
+                <span class="lp-ring-val" id="lpMarketCountVal">&mdash;</span>
+              </div>
+              <div class="lp-metric-text">
+                <h3>Kigali Markets Compared</h3>
+                <p>Real-time price and demand levels tracked across Kigali trading hubs to guide sales destinations.</p>
+              </div>
+            </div>
+
+            <p class="lp-metric-caption">Rings are visual indicators, not statistics.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- D. HOW IT WORKS (#how-it-works) — STICKY STACKING CARDS -->
+    <section class="lp-how-section lp-section-target" id="how-it-works" aria-labelledby="how-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">End-to-End Workflow</span>
+          <h2 class="lp-section-title" id="how-heading">How METLINK Works for Kamonyi Farmers</h2>
+          <p class="lp-section-desc">From one-time field registration to instant SMS market recommendations.</p>
+        </div>
+
+        <!-- Sticky Stacking Cards Container -->
+        <div class="lp-stack-container" id="lpStackContainer">
+          <!-- Step 01 -->
+          <div class="lp-stack-card-wrapper lp-stack-1">
+            <div class="lp-stack-card">
+              <div class="lp-stack-card-header">
+                <span class="lp-step-num">Step 01</span>
+                <div class="lp-step-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+              </div>
+              <h3 class="lp-stack-card-title">Admin Field Onboarding</h3>
+              <p class="lp-stack-card-text">Kamonyi farmers are registered once in their local sector by an authorized agricultural field administrator. The administrator records their phone number, cooperative sector (such as Runda or Gacurabwenge), and preferred language (English or Kinyarwanda). No public sign-up form or internet access is required.</p>
+            </div>
+          </div>
+
+          <!-- Step 02 -->
+          <div class="lp-stack-card-wrapper lp-stack-2">
+            <div class="lp-stack-card">
+              <div class="lp-stack-card-header">
+                <span class="lp-step-num">Step 02</span>
+                <div class="lp-step-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/></svg>
+                </div>
+              </div>
+              <h3 class="lp-stack-card-title">Dial *123# on Any Phone</h3>
+              <p class="lp-stack-card-text">When harvest approaches, the farmer dials *123# from any basic phone. An interactive USSD menu prompts them to select their expected harvest date, volume in kilograms, ripeness stage (Green, Turning, or Ripe), and whether ventilated storage or shade is available. The submission completes in under two minutes.</p>
+            </div>
+          </div>
+
+          <!-- Step 03 -->
+          <div class="lp-stack-card-wrapper lp-stack-3">
+            <div class="lp-stack-card">
+              <div class="lp-stack-card-header">
+                <span class="lp-step-num">Step 03</span>
+                <div class="lp-step-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+                </div>
+              </div>
+              <h3 class="lp-stack-card-title">Rule and Market Engine Evaluation</h3>
+              <p class="lp-stack-card-text">METLINK's decision engine automatically cross-references the farmer's submission against the active agricultural season, current wholesale prices across Kigali trading centers, reported demand levels, and calibrated safety rules. A strict guardrail ensures holding produce is only recommended if preservation conditions exist.</p>
+            </div>
+          </div>
+
+          <!-- Step 04 -->
+          <div class="lp-stack-card-wrapper lp-stack-4">
+            <div class="lp-stack-card">
+              <div class="lp-stack-card-header">
+                <span class="lp-step-num">Step 04</span>
+                <div class="lp-step-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+              </div>
+              <h3 class="lp-stack-card-title">Instant Actionable SMS Advice</h3>
+              <p class="lp-stack-card-text">Within seconds of submission, the farmer receives an actionable SMS in Kinyarwanda or English. The recommendation clearly states SELL NOW, STORE AND WAIT, or SEEK ALTERNATIVE MARKET, accompanied by the primary market price and the rationale behind the advice.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- E. BILINGUAL USSD GUIDE (#ussd-guide) -->
+        <div class="lp-ussd-block lp-section-target" id="ussd-guide" aria-labelledby="ussd-guide-heading">
+          <div class="lp-ussd-toggle-bar">
+            <div>
+              <h3 class="lp-stack-card-title" id="ussd-guide-heading" style="margin: 0 0 4px;">Interactive USSD Walkthrough</h3>
+              <p class="lp-section-desc" style="font-size: var(--font-sm, 14px);">Simulated view of the *123# phone session and step-by-step guidance.</p>
+            </div>
+            <!-- Language Toggle Switcher -->
+            <div class="lp-lang-switcher" role="group" aria-label="Select demonstration language">
+              <button type="button" class="lp-lang-btn" data-lang="en" aria-pressed="true">English</button>
+              <button type="button" class="lp-lang-btn" data-lang="rw" aria-pressed="false">Kinyarwanda</button>
+            </div>
+          </div>
+
+          <div class="lp-ussd-grid">
+            <!-- Feature Phone Mockup -->
+            <div class="lp-phone-mockup" aria-hidden="true">
+              <div class="lp-phone-speaker"></div>
+              <div class="lp-phone-screen" id="lpPhoneScreen">METLINK USSD *123#
+
+1. Register Harvest
+2. Kigali Market Prices
+3. Help & Support
+
+Select option: [1]
+
+Tomato Ripeness:
+1. Green (Firm)
+2. Turning (Pink/Orange)
+3. Ripe (Ready to eat)
+Select: [3]
+
+Harvest Quantity (kg):
+[250]
+
+Ventilated Storage ready?
+1. Yes  2. No
+Select: [2]
+
+Submission received!
+Advice SMS arriving shortly.</div>
+              <div class="lp-phone-keypad">
+                <span class="lp-key">1</span><span class="lp-key">2</span><span class="lp-key">3</span>
+                <span class="lp-key">4</span><span class="lp-key">5</span><span class="lp-key">6</span>
+                <span class="lp-key">7</span><span class="lp-key">8</span><span class="lp-key">9</span>
+                <span class="lp-key">*</span><span class="lp-key">0</span><span class="lp-key">#</span>
+              </div>
+            </div>
+
+            <!-- Numbered Instruction Steps Container -->
+            <!-- NOTE: The Kinyarwanda translations below are for illustration and need review by a native Kinyarwanda speaker before the demo. -->
+            <div class="lp-ussd-instructions-wrap" id="lpUssdInstructions">
+              <!-- Dynamically populated via initUssdToggle() in landing.js -->
+              <ol class="lp-ussd-steps-list">
+                <li class="lp-ussd-step-item">
+                  <strong>Dial *123# on Any Mobile Phone</strong>
+                  <p style="margin: 4px 0 0;">Works on any basic feature phone across MTN and Airtel networks. No smartphone, mobile app, or internet connection required.</p>
+                </li>
+                <li class="lp-ussd-step-item">
+                  <strong>Select Harvest Registration</strong>
+                  <p style="margin: 4px 0 0;">Choose option 1 to report an upcoming harvest and indicate the ripeness stage of your crop: Green, Turning, or Ripe.</p>
+                </li>
+                <li class="lp-ussd-step-item">
+                  <strong>Enter Quantity &amp; Storage Status</strong>
+                  <p style="margin: 4px 0 0;">Input your expected harvest volume in kilograms and specify whether ventilated crates or cooling shade are available.</p>
+                </li>
+                <li class="lp-ussd-step-item">
+                  <strong>Receive Instant Actionable SMS Advice</strong>
+                  <p style="margin: 4px 0 0;">Within seconds, METLINK sends an SMS with a clear decision: SELL NOW, STORE AND WAIT, or SEEK ALTERNATIVE MARKET with current Kigali prices.</p>
+                </li>
+              </ol>
+            </div>
+          </div>
+          <p class="lp-metric-caption" style="margin-top: var(--space-4, 16px); text-align: center;">This phone mockup illustrates the planned mobile interaction flow.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- F. FEATURES (#features) -->
+    <section class="lp-features-section lp-section-target" id="features" aria-labelledby="features-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">Core Capabilities</span>
+          <h2 class="lp-section-title" id="features-heading">Designed for Rural Reality and Sound Decision-Making</h2>
+          <p class="lp-section-desc">Built strictly around the operational constraints of Kamonyi farmers and cooperative managers.</p>
+        </div>
+
+        <div class="lp-features-grid">
+          <!-- Feature 1 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/></svg>
+            </div>
+            <h3 class="lp-feature-title">Works on Any Phone</h3>
+            <p class="lp-feature-desc">Accessible through standard USSD shortcodes and SMS delivery. No smartphone, mobile app, or data subscription is required.</p>
+          </div>
+
+          <!-- Feature 2 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <h3 class="lp-feature-title">English and Kinyarwanda</h3>
+            <p class="lp-feature-desc">Complete bilingual interface across USSD prompts, SMS recommendations, and user support for clear local comprehension.</p>
+          </div>
+
+          <!-- Feature 3 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3 class="lp-feature-title">Calibrated Rule Engine</h3>
+            <p class="lp-feature-desc">Administrators adjust decision thresholds, pricing tiers, and seasonal parameters directly through a secure administrative panel.</p>
+          </div>
+
+          <!-- Feature 4 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            </div>
+            <h3 class="lp-feature-title">Kigali Price Comparison</h3>
+            <p class="lp-feature-desc">Active market tracking across major Kigali wholesale markets identifies where demand is strongest and prices are highest.</p>
+          </div>
+
+          <!-- Feature 5 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3 class="lp-feature-title">Storage Safety Guardrail</h3>
+            <p class="lp-feature-desc">Holding tomatoes is strictly blocked unless the farmer confirms ventilated preservation, preventing avoidable post-harvest rotting.</p>
+          </div>
+
+          <!-- Feature 6 -->
+          <div class="lp-feature-card">
+            <div class="lp-feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h3 class="lp-feature-title">Admin Onboarding &amp; Audit</h3>
+            <p class="lp-feature-desc">Controlled field onboarding prevents fraudulent submissions, backed by an immutable audit trail of every system decision.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- G. MARKET INSIGHTS (#market-insights) -->
+    <section class="lp-insights-section lp-section-target" id="market-insights" aria-labelledby="insights-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">Live Wholesale Benchmark</span>
+          <h2 class="lp-section-title" id="insights-heading">Current Kigali Market Prices</h2>
+          <p class="lp-section-desc">Average reported wholesale prices across monitored Kigali market centers.</p>
+        </div>
+
+        <div class="lp-chart-card">
+          <div class="lp-chart-header">
+            <div>
+              <h3 style="margin: 0; font-size: var(--font-lg, 18px); font-weight: 700; color: var(--color-text, #0f172a);">Wholesale Price by Market (RWF per kg)</h3>
+              <p style="margin: 2px 0 0; font-size: var(--font-xs, 12px); color: var(--color-text-muted, #64748b);">Sorted from highest to lowest reported average price</p>
+            </div>
+            <div class="lp-chart-updated" id="lpMarketUpdated" style="display: none;"></div>
+          </div>
+
+          <!-- Loading State -->
+          <div class="lp-chart-loading" id="lpMarketLoading">
+            <span class="spinner" style="width: 28px; height: 28px; border-color: var(--color-primary-light); border-top-color: var(--color-primary);"></span>
+            <p style="margin-top: 8px; font-size: var(--font-sm, 14px); color: var(--color-text-muted, #64748b);">Loading published market prices...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div class="lp-chart-empty" id="lpMarketEmpty" style="display: none;">
+            <p style="font-size: var(--font-md, 16px); color: var(--color-text-muted, #64748b);">No market prices published yet.</p>
+          </div>
+
+          <!-- Error State -->
+          <div class="lp-chart-error" id="lpMarketError" style="display: none;">
+            <div class="alert alert-error" style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <span>Live prices are unavailable right now. Please try again later.</span>
+              <button type="button" class="btn btn-sm btn-outline" id="lpMarketRetryBtn" style="color: inherit; border-color: currentColor;">Retry</button>
+            </div>
+          </div>
+
+          <!-- Interactive Bar Chart Container -->
+          <div id="lpMarketChartContainer" style="display: none;"></div>
+
+          <!-- Mandatory Section Disclaimer -->
+          <div class="lp-disclaimer-card" role="note">
+            <p>METLINK is a decision-support tool. Recommendations are based on reported market and seasonal data and do not guarantee market prices, buyers, or income.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- H. PLATFORM PREVIEW (#platform-preview) -->
+    <section class="lp-preview-section lp-section-target" id="platform-preview" aria-labelledby="preview-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">Administrative Interface</span>
+          <h2 class="lp-section-title" id="preview-heading">Calibrating Rules and Market Intelligence</h2>
+          <p class="lp-section-desc">How agricultural analysts and cooperative officers configure decisions without writing code.</p>
+        </div>
+
+        <div class="lp-preview-grid">
+          <!-- Side 1: Stacked Mockups in Browser Frame -->
+          <div class="lp-browser-frame" aria-hidden="true">
+            <div class="lp-browser-topbar">
+              <div class="lp-browser-dots">
+                <span class="lp-browser-dot"></span>
+                <span class="lp-browser-dot"></span>
+                <span class="lp-browser-dot"></span>
+              </div>
+              <div class="lp-browser-url">https://admin.metlink.rw/dashboard</div>
+              <span class="lp-browser-watermark">Sample data for illustration</span>
+            </div>
+
+            <div class="lp-mockup-body">
+              <!-- Mockup 1: KPI Row -->
+              <div class="lp-mockup-kpi-row">
+                <div class="lp-mini-kpi">
+                  <span class="lp-mini-kpi-label">Registered</span>
+                  <span class="lp-mini-kpi-val">128</span>
+                </div>
+                <div class="lp-mini-kpi">
+                  <span class="lp-mini-kpi-label">Markets</span>
+                  <span class="lp-mini-kpi-val">6</span>
+                </div>
+                <div class="lp-mini-kpi">
+                  <span class="lp-mini-kpi-label">Active Rules</span>
+                  <span class="lp-mini-kpi-val">14</span>
+                </div>
+                <div class="lp-mini-kpi">
+                  <span class="lp-mini-kpi-label">SMS Sent</span>
+                  <span class="lp-mini-kpi-val">412</span>
+                </div>
+              </div>
+
+              <!-- Mockup 2: Decision Rules Matrix -->
+              <div class="lp-mockup-card">
+                <div class="lp-mockup-card-title">Decision Rules Matrix</div>
+                <table class="lp-mockup-table">
+                  <thead>
+                    <tr><th>Maturity</th><th>Demand</th><th>Storage</th><th>Recommendation</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Ripe</td>
+                      <td><span class="lp-mockup-pill" style="color: #27ae60; border-color: #27ae60;">HIGH</span></td>
+                      <td>Any</td>
+                      <td><span class="lp-mockup-pill" style="color: #d63031; border-color: #d63031;">SELL NOW</span></td>
+                    </tr>
+                    <tr>
+                      <td>Green</td>
+                      <td><span class="lp-mockup-pill" style="color: #d97706; border-color: #d97706;">MEDIUM</span></td>
+                      <td>Ventilated</td>
+                      <td><span class="lp-mockup-pill" style="color: #2563eb; border-color: #2563eb;">STORE &amp; WAIT</span></td>
+                    </tr>
+                    <tr>
+                      <td>Turning</td>
+                      <td><span class="lp-mockup-pill" style="color: #dc2626; border-color: #dc2626;">LOW</span></td>
+                      <td>None</td>
+                      <td><span class="lp-mockup-pill" style="color: #d97706; border-color: #d97706;">SEEK ALT</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Mockup 3: SMS Dispatch Feed -->
+              <div class="lp-mockup-card">
+                <div class="lp-mockup-card-title">Recent USSD &amp; SMS Dispatches</div>
+                <table class="lp-mockup-table">
+                  <thead>
+                    <tr><th>Farmer</th><th>Sector</th><th>Action</th><th>Delivery</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Farmer #104</td><td>Runda</td><td>SELL NOW</td><td><span style="color: #27ae60; font-weight: 700;">Delivered</span></td></tr>
+                    <tr><td>Farmer #088</td><td>Gacurabwenge</td><td>STORE AND WAIT</td><td><span style="color: #27ae60; font-weight: 700;">Delivered</span></td></tr>
+                    <tr><td>Farmer #112</td><td>Nyamiyaga</td><td>SEEK ALTERNATIVE</td><td><span style="color: #27ae60; font-weight: 700;">Delivered</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Side 2: Explanation Narrative -->
+          <div class="lp-preview-desc">
+            <h3 style="font-size: var(--font-xl, 22px); font-weight: 800; color: var(--color-text, #0f172a); margin: 0 0 var(--space-4, 16px);">Transparent Governance Without Writing Code</h3>
+            <p style="color: var(--color-text, #334155); line-height: 1.7; margin-bottom: var(--space-4, 16px);">METLINK provides agricultural extension officers and market analysts with an intuitive control panel to monitor harvest submissions and calibrate decision criteria.</p>
+            <ul style="padding-left: var(--space-5, 20px); margin: 0 0 var(--space-6, 24px); color: var(--color-text, #334155); line-height: 1.7;">
+              <li><strong>Dynamic Rules:</strong> Create and adjust rule priorities based on changing seasonal demand or road access.</li>
+              <li><strong>Market Calibration:</strong> Update daily wholesale prices and demand indicators across Kigali markets.</li>
+              <li><strong>Safety Enforcement:</strong> The system strictly rejects rule configurations that recommend waiting without verified preservation.</li>
+              <li><strong>Full Auditability:</strong> Every farmer interaction, rule adjustment, and SMS dispatch is recorded in a tamper-evident audit log.</li>
+            </ul>
+            <a href="login.html" class="btn btn-outline">Enter Admin Portal</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- I. PILOT & CONTACT (#contact) -->
+    <section class="lp-contact-section lp-section-target" id="contact" aria-labelledby="contact-heading">
+      <div class="lp-container">
+        <div class="lp-section-header">
+          <span class="lp-section-tag">Engagement</span>
+          <h2 class="lp-section-title" id="contact-heading">Pilot Program &amp; Cooperative Contact</h2>
+          <p class="lp-section-desc">Connecting with Kamonyi agricultural cooperatives and district partners.</p>
+        </div>
+
+        <div class="lp-contact-card">
+          <h3 style="font-size: var(--font-lg, 18px); font-weight: 800; color: var(--color-text, #0f172a); margin: 0 0 var(--space-2, 8px);">About the METLINK Pilot</h3>
+          <p style="color: var(--color-text, #334155); line-height: 1.6; margin: 0 0 var(--space-6, 24px);">METLINK is engineered specifically for tomato farmer cooperatives in Kamonyi District and market management authorities in Kigali. By linking field harvests with wholesale market conditions over accessible 2G phone channels, the platform provides timely guidance to prevent spoilage and stabilize rural agricultural incomes.</p>
+
+          <div class="lp-contact-info-grid">
+            <div class="lp-contact-item">
+              <span class="lp-contact-label">Contact Email</span>
+              <span class="lp-contact-val">[CONTACT EMAIL]</span>
+            </div>
+            <div class="lp-contact-item">
+              <span class="lp-contact-label">Contact Phone</span>
+              <span class="lp-contact-val">[CONTACT PHONE]</span>
+            </div>
+            <div class="lp-contact-item">
+              <span class="lp-contact-label">Project Team</span>
+              <span class="lp-contact-val">[PROJECT TEAM OR ORGANIZATION NAME]</span>
+            </div>
+            <div class="lp-contact-item">
+              <span class="lp-contact-label">Pilot Location</span>
+              <span class="lp-contact-val">[PILOT LOCATION DETAILS]</span>
+            </div>
+          </div>
+
+          <div class="lp-contact-action">
+            <a href="mailto:[CONTACT EMAIL]" class="btn btn-primary">Email us: [CONTACT EMAIL]</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="lp-footer">
+    <div class="lp-container">
+      <div class="lp-footer-top">
+        <a href="#home" class="lp-footer-brand" aria-label="METLINK Homepage">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="13" r="8.5" fill="#d63031"/>
+            <path d="M12 4.5 C11.5 2.5, 12.5 1.5, 13 1 C13.5 1.5, 14 2.5, 13.5 4.5" stroke="#27ae60" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M10 5 C8.5 3.8, 7.8 4.2, 7.5 4.5 C8.5 5.5, 9.5 5.5, 10.5 5.3" stroke="#27ae60" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M14 5 C15.5 3.8, 16.2 4.2, 16.5 4.5 C15.5 5.5, 14.5 5.5, 13.5 5.3" stroke="#27ae60" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span>METLINK</span>
+        </a>
+
+        <ul class="lp-footer-nav" aria-label="Footer Navigation">
+          <li><a href="#home">Home</a></li>
+          <li><a href="#problem">The Problem</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#market-insights">Market Insights</a></li>
+          <li><a href="#platform-preview">Platform Preview</a></li>
+          <li><a href="#contact">Pilot / Contact</a></li>
+          <li><a href="login.html">Admin Portal</a></li>
+        </ul>
+      </div>
+
+      <!-- Mandatory Footer Disclaimer -->
+      <div class="lp-footer-disclaimer">
+        <p style="margin: 0;">METLINK is a decision-support tool. Recommendations are based on reported market and seasonal data and do not guarantee market prices, buyers, or income.</p>
+      </div>
+
+      <div class="lp-footer-bottom">
+        <div>Built for Kamonyi tomato growers and Kigali market administrators.</div>
+        <div>&copy; <span id="lpCurrentYear">2026</span> METLINK. All rights reserved.</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts: api.js, then landing.js -->
+  <script src="js/api.js"></script>
+  <script src="js/landing.js"></script>
+</body>
+</html>
