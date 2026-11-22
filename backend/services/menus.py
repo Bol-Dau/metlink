@@ -160,8 +160,8 @@ def screen_ask_quantity(lang: str, harvest_date: Optional[date] = None, error: O
     header = f"Date: {format_readable_date(harvest_date)}\n" if harvest_date else ""
     prompt = _t(
         lang,
-        f"{header}Quantity in kg (whole number):\n0. Back",
-        f"{header}Ingano muri kg (umubare wuzuye):\n0. Subira",
+        f"{header}Enter Quantity in kg (whole number):\n0. Back",
+        f"{header}Kwinjira Ingano muri kg (umubare wuzuye):\n0. Subira",
     )
     if error:
         return f"{error}\n{prompt}"
