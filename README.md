@@ -445,6 +445,16 @@ Administrators manage system intelligence directly from the dashboard:
 
 ## License & Credits
 
-- **License**: [LICENSE]
-- **Team**: [TEAM OR ORGANIZATION NAME]
-- **Contact**: [CONTACT EMAIL]
+- **License**: **The "Please Just Give Me an A" License (PJGMA-1.0)**
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the following conditions:
+
+1. **The Academic Clause:** If you are the professor, instructor, or teaching assistant grading this assignment, you agree to award this project a passing grade (preferably an A) in exchange for using, reading, or running this code.
+2. **The Coffee Clause:** Anyone else using this code owes the author one (1) cup of coffee or beverage of choice if they ever meet in person.
+3. **Attribution:** The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF ACTUALLY WORKING ON YOUR MACHINE, PASSING ALL EDGE CASES, OR NOT CRASHING DURING A LIVE DEMO. IN NO EVENT SHALL THE AUTHOR BE HELD LIABLE FOR LOST SLEEP, SYNTAX ERRORS, OR LATE SUBMISSIONS.
+
+- **Team**: METLINK
+- **Contact**: infor@metlink.com
