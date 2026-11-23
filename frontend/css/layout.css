@@ -809,3 +809,279 @@ html, body {
   box-sizing: border-box;
 }
 
+/* ==========================================================================
+   Admin Hero Photographic Banners (.admin-hero-banner)
+   ========================================================================== */
+.admin-hero-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: var(--space-6, 24px);
+  background-image: var(--admin-hero-img, url('../images/admin-hero.jpg'));
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+  min-height: 135px;
+  padding: 24px 32px;
+}
+
+.admin-hero-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+  90deg, rgba(20, 40, 29, 0.90) 0%, rgba(20, 40, 29, 0.82) 38%, rgba(20, 40, 29, 0.25) 62%, rgba(20, 40, 29, 0.00) 80%);
+}
+
+.admin-hero-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  max-width: 680px;
+}
+
+.admin-hero-bar {
+  width: 4px;
+  border-radius: 2px;
+  background-color: #dc2626;
+  flex-shrink: 0;
+}
+
+.admin-hero-banner--green .admin-hero-bar {
+  background-color: #22c55e;
+}
+
+.admin-hero-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.admin-hero-title {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  line-height: 1.25;
+  margin: 0 0 6px;
+  letter-spacing: -0.015em;
+}
+
+.admin-hero-subtitle {
+  color: rgba(255, 255, 255, 0.90);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Flagship Tall Banner on Dashboard */
+.admin-hero-banner--lg {
+  min-height: 215px;
+  padding: 32px 36px;
+}
+
+.admin-hero-banner--lg .admin-hero-content {
+  max-width: 740px;
+}
+
+.admin-hero-banner--lg .admin-hero-title {
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  margin-bottom: 8px;
+}
+
+.admin-hero-banner--lg .admin-hero-subtitle {
+  font-size: 1rem;
+  margin-bottom: 16px;
+}
+
+.admin-hero-profile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  font-size: var(--font-xs, 12px);
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+}
+
+.admin-hero-profile strong {
+  color: #ffffff;
+}
+
+/* Scope role pill override strictly inside admin-hero-banner */
+.admin-hero-banner #heroRoleBadge,
+.admin-hero-banner .badge {
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 768px) {
+  .admin-hero-banner {
+    min-height: 120px;
+    padding: 20px 20px;
+  }
+
+  .admin-hero-banner--lg {
+    min-height: 180px;
+    padding: 24px 20px;
+  }
+
+  .admin-hero-banner::before {
+  background: linear-gradient(
+    90deg, rgba(20, 40, 29, 0.90) 0%, rgba(20, 40, 29, 0.82) 38%, rgba(20, 40, 29, 0.25) 62%, rgba(20, 40, 29, 0.00) 80%);  }
+}
+
+/* ==========================================================================
+   Dashboard Vibrant Quick-Link Cards (.home-qcard)
+   ========================================================================== */
+.home-qcards-section {
+  margin-bottom: var(--space-6, 24px);
+}
+
+.home-qcards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.home-qcard {
+  border-radius: var(--radius-md, 10px);
+  padding: 18px 16px;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.home-qcard-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #ffffff;
+}
+
+.home-qcard-badge svg {
+  stroke: #ffffff !important;
+}
+
+.home-qcard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-qcard-title {
+  font-weight: 700;
+  font-size: var(--font-base, 15px);
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.home-qcard-desc {
+  font-size: var(--font-xs, 12px);
+  color: #334155;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Card 1: Farmers */
+.home-qcard--farmers {
+  background-color: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+}
+.home-qcard--farmers .home-qcard-badge {
+  background-color: #16a34a;
+}
+.home-qcard--farmers:focus-visible {
+  outline: 2px solid #15803d;
+  outline-offset: 2px;
+}
+
+/* Card 2: Market Prices */
+.home-qcard--markets {
+  background-color: #fffbeb;
+  border: 1.5px solid #fde68a;
+}
+.home-qcard--markets .home-qcard-badge {
+  background-color: #d97706;
+}
+.home-qcard--markets:focus-visible {
+  outline: 2px solid #b45309;
+  outline-offset: 2px;
+}
+
+/* Card 3: Seasons */
+.home-qcard--seasons {
+  background-color: #f0fdfa;
+  border: 1.5px solid #99f6e4;
+}
+.home-qcard--seasons .home-qcard-badge {
+  background-color: #0d9488;
+}
+.home-qcard--seasons:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+/* Card 4: Rules */
+.home-qcard--rules {
+  background-color: #fef2f2;
+  border: 1.5px solid #fecaca;
+}
+.home-qcard--rules .home-qcard-badge {
+  background-color: #dc2626;
+}
+.home-qcard--rules:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
+}
+
+/* Card 5: Logs */
+.home-qcard--logs {
+  background-color: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+}
+.home-qcard--logs .home-qcard-badge {
+  background-color: #2563eb;
+}
+.home-qcard--logs:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .home-qcard:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-qcard {
+    transition: none !important;
+  }
+  .home-qcard:hover {
+    transform: none !important;
+  }
+}
+
