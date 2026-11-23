@@ -8,9 +8,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>METLINK — Decision Rules</title>
+  <script>
+    try {
+      if (localStorage.getItem('metlink_theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    } catch (e) {}
+  </script>
   <script src="js/sidebar.js"></script>
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/dark.css">
   <style>
     /* Modal Dialog Styles */
     dialog.modal-dialog {
@@ -195,6 +203,17 @@
           <div id="alertError" class="alert alert-error" role="alert" aria-live="assertive" style="display: none; justify-content: space-between; align-items: center;">
             <span id="alertErrorText"></span>
             <button type="button" id="dismissAlertErrorBtn" style="background: none; border: none; font-size: var(--font-lg); line-height: 1; cursor: pointer; color: inherit; padding: 0 var(--space-2);" aria-label="Dismiss error banner">&times;</button>
+          </div>
+        </div>
+
+        <!-- Photographic Hero Banner -->
+        <div class="admin-hero-banner">
+          <div class="admin-hero-content">
+            <div class="admin-hero-bar" aria-hidden="true"></div>
+            <div class="admin-hero-text">
+              <h2 class="admin-hero-title">Harvest Advisory Decision Rules</h2>
+              <p class="admin-hero-subtitle">Manage ripeness, storage safety, and market timing logic.</p>
+            </div>
           </div>
         </div>
 

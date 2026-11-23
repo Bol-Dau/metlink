@@ -44,7 +44,13 @@ function initNav() {
 
   if (!navbar) return;
 
-  // 1. Scroll shadow state
+  // 1. Scroll shadow state & dynamic navbar height variable
+  const updateNavHeight = () => {
+    document.documentElement.style.setProperty('--lp-nav-h', `${navbar.offsetHeight}px`);
+  };
+  window.addEventListener('resize', updateNavHeight, { passive: true });
+  updateNavHeight();
+
   const handleScroll = () => {
     if (window.scrollY > 20) {
       navbar.classList.add('lp-scrolled');
@@ -89,29 +95,65 @@ function initNav() {
     });
   }
 
-  // 3. Scrollspy with IntersectionObserver
-  const sections = document.querySelectorAll('section[id], header[id]');
-  if ('IntersectionObserver' in window && sections.length > 0) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const id = entry.target.getAttribute('id');
-          navLinks.forEach(link => {
-            const href = link.getAttribute('href') || '';
-            if (href === `#${id}`) {
-              link.classList.add('lp-active');
-            } else {
-              link.classList.remove('lp-active');
-            }
-          });
+  // 3. Scrollspy with IntersectionObserver (observes header#home and main sections)
+  const sections = Array.from(document.querySelectorAll('header#home, main > section[id]'));
+  if (sections.length > 0) {
+    const navH = navbar.offsetHeight || 72;
+
+    const setActiveLink = (targetId) => {
+      navLinks.forEach(link => {
+        const href = link.getAttribute('href') || '';
+        if (href === `#${targetId}`) {
+          link.classList.add('lp-active');
+        } else {
+          link.classList.remove('lp-active');
         }
       });
-    }, {
-      rootMargin: '-20% 0px -70% 0px',
-      threshold: 0
-    });
+    };
 
-    sections.forEach(sec => observer.observe(sec));
+    if ('IntersectionObserver' in window) {
+      const intersectingMap = new Map();
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const id = entry.target.getAttribute('id');
+          if (entry.isIntersecting) {
+            intersectingMap.set(id, entry.target);
+          } else {
+            intersectingMap.delete(id);
+          }
+        });
+
+        // Bottom of page check: highlight contact if reached very bottom
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 60) {
+          const lastSec = sections[sections.length - 1];
+          if (lastSec) setActiveLink(lastSec.id);
+          return;
+        }
+
+        if (intersectingMap.size > 0) {
+          let bestId = null;
+          let minDiff = Infinity;
+          intersectingMap.forEach((target, id) => {
+            const rect = target.getBoundingClientRect();
+            const diff = Math.abs(rect.top - navH);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestId = id;
+            }
+          });
+          if (bestId) {
+            const targetNavId = (bestId === 'ussd-guide') ? 'how-it-works' : bestId;
+            setActiveLink(targetNavId);
+          }
+        }
+      }, {
+        rootMargin: `-${navH}px 0px -55% 0px`,
+        threshold: [0, 0.1, 0.25, 0.5]
+      });
+
+      sections.forEach(sec => observer.observe(sec));
+    }
   }
 }
 
@@ -240,66 +282,64 @@ function initRings() {
 }
 
 /**
- * Feature D: Sticky Stacking Cards with Scroll-Linked Depth
+ * Feature D: Sticky Stacking Cards — Instant Zero-Peeking Swaps
  */
 function initStackCards() {
   const container = document.getElementById('lpStackContainer');
   if (!container) return;
 
-  const wrappers = container.querySelectorAll('.lp-stack-card-wrapper');
-  if (wrappers.length === 0) return;
+  const cards = Array.from(container.querySelectorAll('.lp-stack-card'));
+  if (cards.length === 0) return;
 
   let ticking = false;
 
-  function updateCardScales() {
+  function updateCardVisibility() {
     ticking = false;
-    if (prefersReducedMotion()) {
-      wrappers.forEach(w => {
-        const card = w.querySelector('.lp-stack-card');
-        if (card) {
-          card.style.transform = 'none';
-          card.style.opacity = '1';
-        }
+    if (window.innerWidth < 768 || window.innerHeight < 700) {
+      cards.forEach(card => {
+        card.style.visibility = 'visible';
       });
       return;
     }
 
-    const navOffset = 90;
+    const navOffset = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--lp-nav-h'), 10) || 72;
+    const stackGap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--lp-stack-gap'), 10) || 28;
+    const stickyTop = navOffset + stackGap;
 
-    for (let i = 0; i < wrappers.length - 1; i++) {
-      const currentWrapper = wrappers[i];
-      const nextWrapper = wrappers[i + 1];
-      const card = currentWrapper.querySelector('.lp-stack-card');
-      if (!card) continue;
+    for (let i = 0; i < cards.length - 1; i++) {
+      const nextCard = cards[i + 1];
+      const nextRect = nextCard.getBoundingClientRect();
 
-      const nextRect = nextWrapper.getBoundingClientRect();
-      const currentRect = currentWrapper.getBoundingClientRect();
-
-      // How close is the next card to sticking over the current one?
-      const overlapStart = window.innerHeight * 0.8;
-      const overlapEnd = navOffset + 80;
-
-      if (nextRect.top < overlapStart) {
-        const progress = Math.min(1, Math.max(0, (overlapStart - nextRect.top) / (overlapStart - overlapEnd)));
-        const scale = 1 - (progress * 0.06); // scale down to 0.94
-        const opacity = 1 - (progress * 0.12); // dim to 0.88
-        card.style.transform = `scale(${scale})`;
-        card.style.opacity = `${opacity}`;
+      // Card i is fully covered once Card i+1 lands at the sticky top
+      if (nextRect.top <= stickyTop + 1) {
+        cards[i].style.visibility = 'hidden';
       } else {
-        card.style.transform = 'scale(1)';
-        card.style.opacity = '1';
+        cards[i].style.visibility = 'visible';
       }
+    }
+
+    // Topmost card is always visible
+    const topCard = cards[cards.length - 1];
+    if (topCard) {
+      topCard.style.visibility = 'visible';
     }
   }
 
   window.addEventListener('scroll', () => {
     if (!ticking) {
-      window.requestAnimationFrame(updateCardScales);
+      window.requestAnimationFrame(updateCardVisibility);
       ticking = true;
     }
   }, { passive: true });
 
-  updateCardScales();
+  window.addEventListener('resize', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(updateCardVisibility);
+      ticking = true;
+    }
+  }, { passive: true });
+
+  updateCardVisibility();
 }
 
 /**
@@ -443,8 +483,16 @@ function initMarketChart() {
     const norm = (level || '').toUpperCase();
     if (norm === 'HIGH') return 'badge badge-success badge-demand badge-demand-high';
     if (norm === 'MEDIUM') return 'badge badge-warning badge-demand badge-demand-medium';
-    if (norm === 'LOW') return 'badge badge-danger badge-demand badge-demand-low';
-    return 'badge badge-info badge-demand';
+    if (norm === 'LOW') return 'badge badge-slate badge-demand badge-demand-low';
+    return 'badge badge-slate badge-demand';
+  }
+
+  function getDemandBarClass(level) {
+    const norm = (level || '').toUpperCase();
+    if (norm === 'HIGH') return 'lp-bar-fill lp-bar-fill--high';
+    if (norm === 'MEDIUM') return 'lp-bar-fill lp-bar-fill--medium';
+    if (norm === 'LOW') return 'lp-bar-fill lp-bar-fill--low';
+    return 'lp-bar-fill lp-bar-fill--unknown';
   }
 
   function formatPrice(val) {
@@ -500,12 +548,15 @@ function initMarketChart() {
       infoDiv.appendChild(nameSpan);
       infoDiv.appendChild(locSpan);
 
-      // 2. Center Bar Track
+      // 2. Center Bar Track & Value Slot
+      const barArea = document.createElement('div');
+      barArea.className = 'lp-bar-area';
+
       const trackDiv = document.createElement('div');
       trackDiv.className = 'lp-bar-track';
 
       const fillDiv = document.createElement('div');
-      fillDiv.className = 'lp-bar-fill';
+      fillDiv.className = getDemandBarClass(demand);
       fillDiv.dataset.targetWidth = `${(price / maxPrice) * 100}%`;
 
       const valSpan = document.createElement('span');
@@ -513,7 +564,8 @@ function initMarketChart() {
       valSpan.textContent = formatPrice(price);
 
       trackDiv.appendChild(fillDiv);
-      trackDiv.appendChild(valSpan);
+      barArea.appendChild(trackDiv);
+      barArea.appendChild(valSpan);
 
       // 3. Right Demand Badge
       const badgeWrap = document.createElement('div');
@@ -526,7 +578,7 @@ function initMarketChart() {
       badgeWrap.appendChild(badge);
 
       li.appendChild(infoDiv);
-      li.appendChild(trackDiv);
+      li.appendChild(barArea);
       li.appendChild(badgeWrap);
       ul.appendChild(li);
     });
@@ -593,6 +645,43 @@ function initMarketChart() {
 }
 
 /**
+ * Feature F: Features Bento Staggered Entrance
+ */
+function initFeatureEntrance() {
+  const featuresSection = document.getElementById('features');
+  if (!featuresSection) return;
+
+  const cards = featuresSection.querySelectorAll('.lp-feature-card');
+  if (cards.length === 0) return;
+
+  if (prefersReducedMotion()) {
+    cards.forEach(card => card.classList.add('lp-feature-revealed'));
+    return;
+  }
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          cards.forEach((card, idx) => {
+            setTimeout(() => {
+              card.classList.add('lp-feature-revealed');
+            }, idx * 70);
+          });
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.15
+    });
+
+    observer.observe(featuresSection);
+  } else {
+    cards.forEach(card => card.classList.add('lp-feature-revealed'));
+  }
+}
+
+/**
  * Feature G: Copyright Current Year
  */
 function initYear() {
@@ -611,6 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initRings();
   initStackCards();
   initUssdToggle();
+  initFeatureEntrance();
   initMarketChart();
   initYear();
 });

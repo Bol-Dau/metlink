@@ -223,8 +223,8 @@ def screen_confirm(
 def screen_cancelled(lang: str) -> str:
     return _t(
         lang,
-        "Cancelled. Nothing was saved.",
-        "Byahagaritswe. Nta kintu cyabitswe.",
+        "Cancelled Submission",
+        "Ubusabe Bwahagaritswe",
     )
 
 

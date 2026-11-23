@@ -22,17 +22,38 @@ postgres_data/
 *.tmp
 *.temp
 *.log
+logs/
 
 # Python Bytecode & Virtual Environments
 __pycache__/
 *.py[cod]
+*.pyc
+*.pyo
 *$py.class
 .venv/
 venv/
 env/
 .pytest_cache/
 
-# Other Files
+# Coverage & Test Artifacts
+htmlcov/
+.coverage
+
+# IDE & Editor Configuration
+.idea/
+.vscode/
+
+# Operating System Files
+.DS_Store
+
+# Node & Package Managers
+node_modules/
+
+# Local Tunnel & Ngrok Binaries
+ngrok
+*.ngrok*
+
+# Project Specific Ignored Files
 .antigravity/
 SPEC.md
 tests.md

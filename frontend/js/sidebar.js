@@ -132,6 +132,136 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutBtn.appendChild(logoutLabel);
   }
 
+  // Inject persistent Dark Mode toggle button right above logout button
+  const sidebarFooter = sidebar.querySelector('.sidebar-footer');
+  let themeToggleBtn = document.getElementById('themeToggleBtn');
+
+  if (sidebarFooter && logoutBtn && !themeToggleBtn) {
+    themeToggleBtn = document.createElement('button');
+    themeToggleBtn.id = 'themeToggleBtn';
+    themeToggleBtn.type = 'button';
+    themeToggleBtn.className = 'btn btn-outline w-full sidebar-theme-toggle';
+    themeToggleBtn.style.marginBottom = 'var(--space-2, 8px)';
+    themeToggleBtn.style.display = 'inline-flex';
+    themeToggleBtn.style.alignItems = 'center';
+    themeToggleBtn.style.justifyContent = 'center';
+    themeToggleBtn.style.gap = 'var(--space-2, 8px)';
+
+    const ICONS_THEME = {
+      moon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+      sun: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+    };
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'sidebar-icon';
+    themeToggleBtn.appendChild(iconSpan);
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'sidebar-label';
+    themeToggleBtn.appendChild(labelSpan);
+
+    function updateThemeUI(isDark) {
+      if (isDark) {
+        iconSpan.innerHTML = ICONS_THEME.sun;
+        labelSpan.textContent = 'Light Mode';
+        themeToggleBtn.title = 'Light Mode';
+        themeToggleBtn.setAttribute('aria-label', 'Switch to light mode');
+        themeToggleBtn.setAttribute('aria-pressed', 'true');
+      } else {
+        iconSpan.innerHTML = ICONS_THEME.moon;
+        labelSpan.textContent = 'Dark Mode';
+        themeToggleBtn.title = 'Dark Mode';
+        themeToggleBtn.setAttribute('aria-label', 'Switch to dark mode');
+        themeToggleBtn.setAttribute('aria-pressed', 'false');
+      }
+    }
+
+    const currentTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('metlink_theme') || 'light';
+    updateThemeUI(currentTheme === 'dark');
+
+    themeToggleBtn.addEventListener('click', () => {
+      const isCurrentlyDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const newTheme = isCurrentlyDark ? 'light' : 'dark';
+      if (newTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      try {
+        localStorage.setItem('metlink_theme', newTheme);
+      } catch (e) {}
+      updateThemeUI(newTheme === 'dark');
+    });
+
+    sidebarFooter.insertBefore(themeToggleBtn, logoutBtn);
+  }
+
+  function syncSidebarFooterLayout() {
+    const isCollapsed = document.documentElement.getAttribute('data-sidebar') === 'collapsed';
+    const isMobile = window.innerWidth <= 768;
+    const btn = document.getElementById('themeToggleBtn');
+    if (!sidebarFooter || !btn) return;
+
+    if (isCollapsed && !isMobile) {
+      sidebarFooter.style.display = 'flex';
+      sidebarFooter.style.flexDirection = 'column';
+      sidebarFooter.style.alignItems = 'center';
+      sidebarFooter.style.padding = 'var(--space-2, 8px)';
+      btn.style.width = '44px';
+      btn.style.minWidth = '44px';
+      btn.style.height = '44px';
+      btn.style.minHeight = '44px';
+      btn.style.padding = '0';
+      btn.style.marginBottom = 'var(--space-2, 8px)';
+      btn.style.justifyContent = 'center';
+    } else {
+      sidebarFooter.style.display = '';
+      sidebarFooter.style.flexDirection = '';
+      sidebarFooter.style.alignItems = '';
+      sidebarFooter.style.padding = '';
+      btn.style.width = '100%';
+      btn.style.minWidth = '';
+      btn.style.height = '';
+      btn.style.minHeight = '44px';
+      btn.style.padding = 'var(--space-2) var(--space-4)';
+      btn.style.marginBottom = 'var(--space-2, 8px)';
+      btn.style.justifyContent = 'center';
+    }
+  }
+
+  syncSidebarFooterLayout();
+  window.addEventListener('resize', syncSidebarFooterLayout);
+
+  // Sync theme changes from other browser tabs
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'metlink_theme') {
+      const isDark = e.newValue === 'dark';
+      if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) {
+        const icon = btn.querySelector('.sidebar-icon');
+        const label = btn.querySelector('.sidebar-label');
+        if (isDark) {
+          if (icon) icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+          if (label) label.textContent = 'Light Mode';
+          btn.title = 'Light Mode';
+          btn.setAttribute('aria-label', 'Switch to light mode');
+          btn.setAttribute('aria-pressed', 'true');
+        } else {
+          if (icon) icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+          if (label) label.textContent = 'Dark Mode';
+          btn.title = 'Dark Mode';
+          btn.setAttribute('aria-label', 'Switch to dark mode');
+          btn.setAttribute('aria-pressed', 'false');
+        }
+      }
+    }
+  });
+
   // Inject collapse/expand toggle button into sidebar header
   let toggleBtn = null;
   if (sidebarHeader) {
@@ -157,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           localStorage.setItem('metlink_sidebar_collapsed', 'false');
         } catch (e) {}
+        syncSidebarFooterLayout();
       } else {
         // Collapse: activate icon rail
         document.documentElement.setAttribute('data-sidebar', 'collapsed');
@@ -166,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           localStorage.setItem('metlink_sidebar_collapsed', 'true');
         } catch (e) {}
+        syncSidebarFooterLayout();
       }
     });
 
