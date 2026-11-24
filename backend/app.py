@@ -30,7 +30,13 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.json = CustomJSONProvider(app)
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    cors_origins_raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not cors_origins_raw or cors_origins_raw == "*":
+        cors_origins = "*"
+    else:
+        cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
 
     @app.get("/")
     def serve_index():

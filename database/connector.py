@@ -47,14 +47,33 @@ def get_db_config(overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     Build PostgreSQL connection parameters from environment variables.
 
     Supported environment variables:
+    - DATABASE_URL (optional: full connection URL, e.g. postgresql://user:pass@host:port/dbname)
     - DB_HOST (default: localhost)
     - DB_PORT (default: 5432)
     - DB_NAME (default: metlink_db)
     - DB_USER (default: metlink_user)
     - DB_PASSWORD (required for authenticated connections)
     - DB_CONNECT_TIMEOUT (default: 5)
+    - DB_SSLMODE (optional: e.g. require, prefer, verify-full; applied only when DATABASE_URL is unset)
     """
     _load_dotenv_if_present()
+
+    timeout_raw = os.getenv("DB_CONNECT_TIMEOUT", "5")
+    try:
+        connect_timeout = int(timeout_raw)
+    except ValueError as exc:
+        raise ValueError(f"Invalid DB_CONNECT_TIMEOUT value: {timeout_raw!r}") from exc
+
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        config: Dict[str, Any] = {
+            "conninfo": database_url,
+            "connect_timeout": connect_timeout,
+            "row_factory": dict_row,
+        }
+        if overrides:
+            config.update(overrides)
+        return config
 
     port_raw = os.getenv("DB_PORT", "5432")
     try:
@@ -62,15 +81,19 @@ def get_db_config(overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     except ValueError as exc:
         raise ValueError(f"Invalid DB_PORT value: {port_raw!r}") from exc
 
-    config: Dict[str, Any] = {
+    config = {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": port,
         "dbname": os.getenv("DB_NAME", "metlink_db"),
         "user": os.getenv("DB_USER", "metlink_user"),
         "password": os.getenv("DB_PASSWORD", ""),
-        "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "5")),
+        "connect_timeout": connect_timeout,
         "row_factory": dict_row,
     }
+
+    sslmode = os.getenv("DB_SSLMODE", "").strip()
+    if sslmode:
+        config["sslmode"] = sslmode
 
     if overrides:
         config.update(overrides)
@@ -84,17 +107,23 @@ def create_connection(overrides: Optional[Dict[str, Any]] = None) -> psycopg.Con
     Raises psycopg.OperationalError if the connection cannot be established.
     """
     config = get_db_config(overrides=overrides)
+    conninfo = config.pop("conninfo", None)
     try:
+        if conninfo:
+            return psycopg.connect(conninfo, **config)
         return psycopg.connect(**config)
     except psycopg.Error as exc:
-        logger.error(
-            "Failed to connect to PostgreSQL database '%s' at %s:%s as user '%s': %s",
-            config.get("dbname"),
-            config.get("host"),
-            config.get("port"),
-            config.get("user"),
-            exc,
-        )
+        if conninfo:
+            logger.error("Failed to connect to PostgreSQL via DATABASE_URL: %s", exc)
+        else:
+            logger.error(
+                "Failed to connect to PostgreSQL database '%s' at %s:%s as user '%s': %s",
+                config.get("dbname"),
+                config.get("host"),
+                config.get("port"),
+                config.get("user"),
+                exc,
+            )
         raise
 
 

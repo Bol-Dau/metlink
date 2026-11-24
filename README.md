@@ -1,449 +1,655 @@
 # METLINK
 
-METLINK is a tomato harvest evaluation and market decision-support platform connecting smallholder tomato farmers in Kamonyi District, Rwanda, with wholesale and retail market intelligence across Kigali. Smallholder farmers interact with the platform using basic feature phones via USSD (`*384*...#`) and automated bilingual SMS advisory messages (in English and Kinyarwanda), while Kigali-based market administrators and analysts maintain market prices, evaluate agricultural seasons, and configure prioritized decision rules through a responsive web portal.
+METLINK is a tomato harvest decision-support platform for smallholder tomato farmers in Kamonyi District, Rwanda, and market administrators in Kigali. Farmers use a basic feature phone: they enter their expected harvest through USSD and receive advice on the screen and by SMS, in English or Kinyarwanda. Administrators use a web portal to register farmers and to keep the market prices, agricultural seasons and decision rules that the advice is based on.
 
 > [!NOTE]
 > METLINK is a decision-support tool. It does not guarantee prices, buyers, or income.
 
 ---
 
-## What It Does
+## Live Demo
 
-- **Farmer USSD Flow**:
-  - Session initiation on basic feature phones via Africa's Talking USSD.
-  - Farmer authentication and profile lookup by phone number (`+250` format).
-  - Language selection (English or Kinyarwanda).
-  - Single-step harvest date entry (`DDMMYYYY`), quantity in kilograms, and maturity stage (green, turning, semi-ripe, ripe).
-  - Immediate on-screen confirmation with resilient back navigation (`0`) and token folding.
-  - Automated dispatch of bilingual GSM-7 SMS advice (under 160 characters) providing recommended action (`SELL_NOW`, `STORE_AND_WAIT`, `SPLIT_SHIPMENT`), targeted markets, and transport guidelines.
-  - *Note on Kinyarwanda copy*: Kinyarwanda text templates require review and validation by a native speaker prior to production deployment.
+This project is deployed for a course demo and non-commercial use. It is not meant for real farmers.
 
-- **Admin Web Portal**:
-  - **Overview Dashboard**: High-level platform KPIs, active season status card, and live audit feed.
-  - **Farmers Directory**: Register, view, search, edit, and toggle active status of Kamonyi tomato farmers.
-  - **Market Intelligence**: Record and monitor wholesale and retail prices, demand levels, and transport costs for Kigali and local markets.
-  - **Agricultural Seasons**: Calibrate Rwandan agricultural season dates (Season A, Season B, Season C).
-  - **Decision Rules Engine**: Maintain prioritized harvest decision rules (min quantity, ripeness matching, storage preservation guards).
-  - **Activity & System Logs**: Multi-tab inspection view covering Farmer USSD Harvest Submissions, SMS Delivery Dispatches, and Administrative Audit Trails.
-  - **Staff & Admins Management**: Account provisioning and role-based access management (restricted to `super_admin`).
-  - **Dark Mode**: Persistent dark mode with custom theme toggle, zero flash of unstyled content, and WCAG AA contrast compliance.
+| What | Address |
+|---|---|
+| Landing page | https://metlink.boldau.tech |
+| Admin sign-in | https://metlink.boldau.tech/login.html |
+| Health check | https://metlink.boldau.tech/api/health |
+
+Demo admin accounts. The passwords are not published here. They are given with the project submission and shown in the demo video.
+
+| Username | Role | Password |
+|---|---|---|
+| `aline.uwase` | `super_admin` | `[GIVEN WITH THE SUBMISSION]` |
+| `eric.mugisha` | `market_analyst` | `[GIVEN WITH THE SUBMISSION]` |
+
+The farmer side (USSD and SMS) runs on the Africa's Talking sandbox. Sandbox USSD works only in the sandbox simulator of the account that owns the service code, and sandbox SMS shows only in that simulator. It cannot be dialed from a real phone. The demo video shows the full farmer flow.
 
 ---
 
-## Architecture & Directory Tree
+## What It Does
+
+### Farmer side (USSD and SMS)
+
+- Only farmers registered by an administrator can use the service. Numbers that are not registered, or that were deactivated, get a message telling them to contact the administrator.
+- The farmer chooses English or Kinyarwanda. The choice is saved and used for later screens and SMS.
+- Main menu: submit expected harvest, my submissions, my advice.
+- Submitting a harvest asks for four things, then shows a summary to confirm or cancel:
+  1. Expected harvest date, written as `DD-MM-YYYY` or `DDMMYYYY` (today or later, at most 120 days ahead).
+  2. Expected quantity in kilograms (a whole number, 1 to 100000).
+  3. Tomato maturity: Green, Turning or Ripe.
+  4. Whether a safe place to store tomatoes (cool, ventilated) is available.
+- Invalid input never gets the farmer stuck: the same question is asked again with a short error. Entering `0` goes back one step.
+- After confirmation, the advice is shown on the screen and sent by SMS (160 characters or less, in the farmer's language). The advice is one of three actions: `SELL_NOW`, `STORE_AND_WAIT` or `SEEK_ALTERNATIVE_MARKET`, with a reason, the best market and price when available, and a reminder that it is a guide only.
+- Kinyarwanda text needs a review by a native speaker before it is used in a demo or in production.
+
+### Admin side (web portal)
+
+- **Dashboard:** key numbers, the active season, and recent admin activity.
+- **Farmers:** register, search, edit, activate and deactivate farmers. Records are deactivated, never deleted.
+- **Markets:** record the average price per kg, the demand level (HIGH, MEDIUM, LOW) and the source of each price.
+- **Seasons:** define agricultural seasons (for example Season A, B and C) and which one is active.
+- **Decision rules:** create and edit rules in priority order (lowest number first). A rule can only recommend `STORE_AND_WAIT` when it requires storage. Rules are stored in the database, so they are changed from this page and not by editing the seed file.
+- **Logs:** three tabs for farmer submissions, SMS messages (with provider id and delivery status) and the admin audit trail.
+- **Admins:** create and manage admin accounts. This page is only for `super_admin`.
+- Password change, dark mode, and a public landing page with live market prices.
+
+Admin roles: `super_admin`, `admin` and `market_analyst`. All roles manage farmers, markets, seasons, rules and logs. Only `super_admin` manages admin accounts.
+
+---
+
+## How the Advice Is Decided
+
+For every confirmed submission the engine does the following, in one database transaction:
+
+1. Checks the input (date, quantity, maturity) again.
+2. Finds the active season that contains the harvest date. If there is none, it continues and lowers the confidence.
+3. Reads the active markets. It uses the highest average price per kg and the demand level of that same market.
+4. Uses the price trend. Version 1 keeps no price history, so the trend is always treated as STABLE.
+5. Goes through the active decision rules in priority order and takes the first rule that matches maturity, price trend, demand level, minimum quantity and storage.
+6. Skips any `STORE_AND_WAIT` rule when the farmer has no suitable storage. `STORE_AND_WAIT` is never given without storage.
+7. If no rule matches, gives `SELL_NOW` for ripe tomatoes and `SEEK_ALTERNATIVE_MARKET` otherwise, with LOW confidence. Administrators should then review the rules.
+8. Saves the submission, the recommendation and three evidence records (market, season, rule), then sends the SMS in the background.
+
+### Writing rules that can match
+
+- Because the price trend is always STABLE, a rule with a RISING or FALLING trend cannot match yet. For a rule to fire, set its price trend to STABLE.
+- The demand level used by the rules is the demand level of the highest-priced active market. If that market has HIGH demand, only rules with HIGH demand can match. To test other outcomes, change the demand level or the price of a market on the Markets page.
+- A rule with a minimum quantity only matches submissions at or above that quantity.
+- If every submission shows the fallback text "No specific decision rule matched your harvest criteria", check the Rules page for an active rule that fits the maturity, trend (STABLE), demand level and quantity you entered.
+- Do not run `database/init_remote.sh --reset` or `init_db.sh` after you have changed rules from the portal. They reset the database to the seed rules.
+
+### Known limits of version 1
+
+- No price history, so Rising and Falling rules are ready but cannot match until historical prices are added.
+- No payments, transport, physical storage or buyer matching.
+
+---
+
+## Architecture and Directory Tree
 
 ```text
 metlink/
-├── .env.example                      # Template for database, auth, server, and Africa's Talking credentials
-├── .gitignore                         # Git exclusion rules for secrets, virtual environments, and build artifacts
-├── README.md                          # Platform technical documentation and deployment guide
-├── SPEC.md                            # Master technical architecture specification
-├── init_db.sh                         # Shell script to recreate, schema-migrate, and seed PostgreSQL
-├── requirements.txt                   # Direct Python package dependencies pinned with compatible releases
+├── .env.example                      # Template for database, auth, server and Africa's Talking settings
+├── README.md                         # This guide
+├── init_db.sh                        # Rebuilds and seeds a LOCAL PostgreSQL database (deletes data)
+├── requirements.txt                  # Direct Python dependencies (includes gunicorn)
 ├── database/
-│   ├── connector.py                   # Psycopg 3 connection factory, pooling, and health checks
-│   ├── indexes.sql                    # Performance, partial unique, and foreign key indexes
-│   ├── run_all.sql                    # Unified database setup script
-│   ├── schema.sql                     # PostgreSQL DDL table definitions and automated timestamp triggers
-│   ├── seed.sql                       # Initial Kamonyi and Kigali dataset (admins, markets, rules, seasons)
-│   └── setup.sql                      # Database and role initialization script
+│   ├── connector.py                  # Psycopg 3 connection helper (DATABASE_URL or DB_* settings)
+│   ├── indexes.sql                   # Indexes
+│   ├── init_remote.sh                # Loads schema and seed data into a server or hosted database
+│   ├── run_all.sql                   # Combined setup script
+│   ├── schema.sql                    # Tables, constraints and triggers
+│   ├── seed.sql                      # Starting data (admins, markets, rules, seasons)
+│   └── setup.sql                     # Local database and role setup
 ├── backend/
-│   ├── app.py                         # Flask application factory, CORS setup, and public endpoints
-│   ├── audit.py                       # Structured administrative audit logging helper
-│   ├── auth.py                        # JWT generation, bcrypt password hashing, and role-based route decorators
+│   ├── app.py                        # Flask app, CORS, health check and public endpoints
+│   ├── audit.py                      # Audit log helper
+│   ├── auth.py                       # JWT, bcrypt and role decorators
 │   ├── routes/
-│   │   ├── admin_routes.py            # Administrative CRUD endpoints for farmers, markets, seasons, rules, logs
-│   │   ├── auth_routes.py             # Administrator login, profile inspection, password change, and staff management
-│   │   └── ussd_routes.py             # Africa's Talking USSD callback and SMS delivery status webhook
+│   │   ├── admin_routes.py           # Farmers, markets, seasons, rules, logs
+│   │   ├── auth_routes.py            # Login, profile, password change, admin accounts
+│   │   └── ussd_routes.py            # USSD callback and SMS delivery webhook
 │   ├── services/
-│   │   ├── engine.py                  # Harvest validation logic, rule matching engine, and storage guards
-│   │   ├── farmer_lookup.py           # Rwandan phone normalization (+250) and farmer database lookup
-│   │   ├── menus.py                   # USSD menu state machine, navigation stack, and screen generators
-│   │   ├── session_store.py           # In-memory stateless token folding and session tracking
-│   │   ├── sms_service.py             # Africa's Talking SMS integration, log-only mode, and delivery tracking
-│   │   └── templates.py               # GSM-7 bilingual SMS message builders (English & Kinyarwanda)
+│   │   ├── engine.py                 # Validation, rule matching, storage guard, fallback
+│   │   ├── farmer_lookup.py          # Phone normalization (+250) and farmer lookup
+│   │   ├── menus.py                  # USSD screens and step machine
+│   │   ├── session_store.py          # Replay cache and per-session lock
+│   │   ├── sms_service.py            # Africa's Talking SMS, log-only mode, delivery reports
+│   │   └── templates.py              # English and Kinyarwanda SMS text
 │   └── tests/
-│       ├── manual_sms_probe.py        # Diagnostic script for direct Africa's Talking API verification
-│       ├── test_services.py           # Unit tests for lookup, validation, rules, templates, and SMS logging
-│       ├── test_ussd_fixes.py         # Regression tests for USSD single-step date entry and delivery logs
-│       ├── test_ussd_flow.py          # End-to-end integration tests for USSD sessions with mocked SMS
-│       └── test_ussd_navigation.py    # Resilience tests for USSD token folding and back navigation (0)
+│       ├── manual_sms_probe.py       # Sends one real sandbox SMS to check credentials
+│       ├── test_services.py          # Services tests
+│       ├── test_ussd_fixes.py        # Date entry, SMS logging and never-hang tests
+│       ├── test_ussd_flow.py         # End-to-end USSD tests with mocked SMS
+│       └── test_ussd_navigation.py   # Back navigation and invalid input tests
 ├── frontend/
-│   ├── admins.html                    # Admin portal: staff accounts and role-based access
-│   ├── dashboard.html                 # Admin portal: executive dashboard KPIs and quick actions
-│   ├── farmers.html                   # Admin portal: farmer registration and profile management
-│   ├── index.html                     # Public landing page: market overview and USSD dialing instructions
-│   ├── login.html                     # Admin portal: administrator sign-in page
-│   ├── logs.html                      # Admin portal: harvest submissions, SMS delivery, and audit history
-│   ├── markets.html                   # Admin portal: Kigali and Kamonyi tomato prices and demand
-│   ├── rules.html                     # Admin portal: decision rule prioritization and conditions
-│   ├── seasons.html                   # Admin portal: Rwandan agricultural season calendars
-│   ├── css/
-│   │   ├── dark.css                   # Scoped dark theme overrides (:root[data-theme="dark"])
-│   │   ├── landing.css                # Styles for public marketing landing page and hero carousel
-│   │   ├── layout.css                 # Admin shell layout: sidebar, topbar, cards, and modal dialogs
-│   │   └── theme.css                  # Design tokens, color system, typography, tables, and badge components
-│   ├── js/
-│   │   ├── admins.js                  # Staff table management, role selection, and account creation
-│   │   ├── api.js                     # Centralized fetch wrapper, JWT header injection, and 401 handling
-│   │   ├── auth.js                    # Admin session persistence, route guard, and sign-out handler
-│   │   ├── dashboard.js               # Dashboard summary metrics loader and audit log feed
-│   │   ├── farmers.js                 # Farmer CRUD operations, search filters, and status toggle
-│   │   ├── landing.js                 # Public live market table and interactive USSD visual simulator
-│   │   ├── logs.js                    # Submissions, SMS dispatches, and audit trail tab view controller
-│   │   ├── markets.js                 # Market price updates, demand tracking, and modal controls
-│   │   ├── rules.js                   # Rule prioritization sorting, condition editor, and active status toggle
-│   │   ├── seasons.js                 # Agricultural season date ranges and active season status manager
-│   │   └── sidebar.js                 # Collapsible/resizable sidebar navigation and dark mode toggle button
-│   └── images/
-│       ├── admin-hero.jpg             # Admin header banner photographic imagery
-│       ├── hero-1.jpg                 # Public hero carousel slide 1
-│       ├── hero-2.jpg                 # Public hero carousel slide 2
-│       ├── hero-3.jpg                 # Public hero carousel slide 3
-│       ├── hero-4.jpg                 # Public hero carousel slide 4
-│       ├── hero-5.jpg                 # Public hero carousel slide 5
-│       ├── step-1.jpg                 # How-it-works process card 1
-│       ├── step-2.jpg                 # How-it-works process card 2
-│       ├── step-3.jpg                 # How-it-works process card 3
-│       ├── step-4.jpg                 # How-it-works process card 4
-│       └── tomato-harvest.jpg         # Agricultural produce illustrative graphic
+│   ├── index.html                    # Public landing page
+│   ├── login.html                    # Admin sign-in
+│   ├── dashboard.html                # Admin dashboard
+│   ├── farmers.html                  # Farmers
+│   ├── markets.html                  # Markets
+│   ├── seasons.html                  # Seasons
+│   ├── rules.html                    # Decision rules
+│   ├── logs.html                     # Submissions, SMS and audit logs
+│   ├── admins.html                   # Admin accounts (super_admin only)
+│   ├── css/                          # theme.css, layout.css, landing.css, dark.css
+│   ├── js/                           # api.js, auth.js, sidebar.js, landing.js and one file per page
+│   └── images/                       # Landing page and banner photos
 └── tests/
-    ├── __init__.py                    # Test package indicator
-    ├── test_admin_api.py              # HTTP integration tests covering administrative REST endpoints
-    └── test_metlink.py                # Standalone test runner hook
+    ├── __init__.py
+    ├── test_admin_api.py             # Admin REST API tests (needs the backend running)
+    └── test_metlink.py               # Test runner hook
 ```
 
 ---
 
 ## Prerequisites
 
-- **Python**: Version `3.12+` (compatible with `3.10+`).
-- **PostgreSQL**: Version `12+` (developed and tested on PostgreSQL `16`).
-- **Web Browser**: Modern Google Chrome or Microsoft Edge.
-- **ngrok**: Required for exposing the local Flask backend port to the Africa's Talking sandbox during USSD/SMS testing.
+- Python 3.12 or newer (3.10 and newer should work). Flask 3.1 needs Python 3.9 or newer.
+- PostgreSQL 12 or newer (developed on 16).
+- Google Chrome or Microsoft Edge.
+- ngrok, for testing Africa's Talking against your own computer.
 
 ---
 
-## Local Setup from Scratch
+## Settings (`.env`)
 
-1. **Clone the Repository**:
-   ```bash
-   git clone <repository-url>
-   cd metlink
-   ```
+Copy `.env.example` to `.env` and fill it in. Never commit `.env`.
 
-2. **Create and Activate Virtual Environment**:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. **Install Python Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env
-   ```
-   Open `.env` in a text editor and fill in your local PostgreSQL credentials and Africa's Talking sandbox keys.
-
-5. **Start PostgreSQL**:
-   Ensure PostgreSQL is running locally on port `5432`:
-   ```bash
-   sudo systemctl start postgresql
-   ```
-
-6. **Initialize the Database**:
-   > [!CAUTION]
-   > **`init_db.sh` drops the public schema and deletes all existing data! Never run it against production or a database containing data you want to keep.**
-
-   Run the automated database build and seed script:
-   ```bash
-   chmod +x init_db.sh
-   ./init_db.sh
-   ```
-   The script drops and recreates the public schema, applies `schema.sql`, applies `indexes.sql`, seeds reference data via `seed.sql`, and updates the password hashes for the default administrative accounts.
-
-7. **Default Seeded Admin Accounts**:
-   The database is populated with two local development accounts:
-   - **Super Admin**:
-     - Username: `aline.uwase`
-     - Role: `super_admin`
-     - Email: `aline.uwase@metlink.rw`
-     - Default Password: `Admin@1234`
-   - **Market Analyst**:
-     - Username: `eric.mugisha`
-     - Role: `market_analyst`
-     - Email: `eric.mugisha@metlink.rw`
-     - Default Password: `Analyst@1234`
-
-   *Note: These default credentials are intended strictly for local development and must be rotated or deleted before deploying to production.*
+| Setting | Purpose |
+|---|---|
+| `SECRET_KEY` | Signs login tokens. Use a long random value. |
+| `DATABASE_URL` | One connection address, for example `postgresql://user:password@localhost:5432/metlink`. If it is set, it is used instead of the `DB_*` settings. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Separate database settings, used when `DATABASE_URL` is not set. |
+| `DB_SSLMODE` | Optional SSL mode for the `DB_*` settings. |
+| `DB_CONNECT_TIMEOUT` | Database connection timeout in seconds (default 5). |
+| `CORS_ORIGINS` | Frontend addresses allowed to call the API, separated by commas. If unset or `*`, all origins are allowed. |
+| `COOKIE_SECURE` | Set to `true` when the site is served over HTTPS. |
+| `SMS_MODE` | `live` sends SMS through Africa's Talking. `log_only` only writes to the SMS log. |
+| `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID` | Africa's Talking credentials. Use `sandbox` as the username for the sandbox. Leave the sender id empty. |
+| `AT_WEBHOOK_TOKEN` | If set, the two Africa's Talking endpoints need `?token=<value>` in the URL. |
+| `SMS_SANDBOX_AUTO_DELIVERED` | Demo only. Marks sandbox SMS as `DELIVERED` when they are sent. |
 
 ---
 
-## Running Locally
+## Local Setup and Running
 
-1. **Start the Flask Backend API (Port 5050)**:
-   ```bash
-   python3 backend/app.py
-   ```
-   The backend API will start on `http://0.0.0.0:5050`.
+Follow the steps in order. Each step says what to run, what it does, and what you should see. Use three terminals: one for setup, one for the backend and one for the frontend.
 
-   > [!IMPORTANT]
-   > During Africa's Talking USSD and SMS simulator tests, **run the server without the debug reloader**. If the Flask auto-reloader detects a file change during an active session, the process restart will terminate background SMS worker threads and cause ngrok to return an HTTP `502 Bad Gateway` to Africa's Talking. To start without the reloader, run:
-   > ```bash
-   > flask --app backend/app.py run --host 0.0.0.0 --port 5050 --no-reload
-   > ```
+### Step 1: Get the code
 
-2. **Serve the Frontend (Port 3000)**:
-   In a separate terminal, serve the `frontend/` directory using Python's static HTTP server:
-   ```bash
-   python3 -m http.server 3000 --directory frontend
-   ```
+Run:
+```bash
+git clone <repository-url>
+cd metlink
+```
+What it does: downloads the project into a folder called `metlink`.
 
-3. **Application URLs**:
-   - **Public Landing Page**: [http://localhost:3000/index.html](http://localhost:3000/index.html)
-   - **Admin Sign-In**: [http://localhost:3000/login.html](http://localhost:3000/login.html)
-   - **Admin Dashboard**: [http://localhost:3000/dashboard.html](http://localhost:3000/dashboard.html)
-   - **Farmers Management**: [http://localhost:3000/farmers.html](http://localhost:3000/farmers.html)
-   - **Market Prices**: [http://localhost:3000/markets.html](http://localhost:3000/markets.html)
-   - **Agricultural Seasons**: [http://localhost:3000/seasons.html](http://localhost:3000/seasons.html)
-   - **Decision Rules**: [http://localhost:3000/rules.html](http://localhost:3000/rules.html)
-   - **Activity & System Logs**: [http://localhost:3000/logs.html](http://localhost:3000/logs.html)
-   - **Admins & Staff**: [http://localhost:3000/admins.html](http://localhost:3000/admins.html)
-   - **Backend API Health**: [http://localhost:5050/api/health](http://localhost:5050/api/health)
+### Step 2: Create a virtual environment
+
+Run:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+What it does: makes a private Python folder for this project and turns it on.
+You should see: `(.venv)` at the start of your terminal line.
+
+### Step 3: Install the packages
+
+Run:
+```bash
+pip install -r requirements.txt
+```
+What it does: installs Flask, the database driver, bcrypt, gunicorn and the other packages the project needs.
+You should see: a line starting with `Successfully installed` at the end.
+
+### Step 4: Create your settings file
+
+Run:
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+What it does: copies the settings template to `.env`, then prints a long random text.
+Next: open `.env` in an editor. Paste the random text as `SECRET_KEY`, then fill in your PostgreSQL settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) and your Africa's Talking sandbox keys. The meaning of each setting is in the Settings table above.
+
+### Step 5: Start PostgreSQL
+
+Run:
+```bash
+sudo systemctl start postgresql
+```
+What it does: starts the database program.
+You should see: nothing. No message means it worked.
+
+### Step 6: Build the database
+
+> [!CAUTION]
+> `init_db.sh` drops the public schema and deletes all data in that database. Never run it against a database you want to keep.
+
+Run:
+```bash
+chmod +x init_db.sh
+./init_db.sh
+```
+What it does: creates the tables, adds the indexes, loads the starting data (admins, markets, rules, seasons) and sets the admin passwords.
+You should see: no error messages. If it says the database or user does not exist, create them first with `database/setup.sql`, and make sure the names and password match your `.env`.
+
+### Step 7: Start the backend (first terminal)
+
+Run, from the project folder with the virtual environment on:
+```bash
+python3 -m backend.app
+```
+What it does: starts the API on port 5050.
+You should see: a line saying it is running on port 5050. Keep this terminal open.
+
+### Step 8: Start the frontend (second terminal)
+
+Run:
+```bash
+cd metlink
+python3 -m http.server 3000 --directory frontend
+```
+What it does: shows the web pages on port 3000. This is where the number 3000 comes from. The pages talk to the backend on port 5050 by themselves.
+You should see: a line saying it is serving HTTP on port 3000. Keep this terminal open.
+
+### Step 9: Open the app
+
+- Landing page: http://localhost:3000/index.html
+- Admin sign-in: http://localhost:3000/login.html
+- Health check: http://localhost:5050/api/health. It should show `{"database":"connected","status":"ok"}`.
+
+Use `http://`, not `https://`, on your own computer.
+
+### Local admin accounts
+
+These starting passwords are public. Use them only on your own computer.
+
+| Username | Role | Password |
+|---|---|---|
+| `aline.uwase` | `super_admin` | `Admin@1234` |
+| `eric.mugisha` | `market_analyst` | `Analyst@1234` |
+
+### Testing Africa's Talking from your computer
+
+The command in step 7 uses a reloader that restarts the backend when a file changes. That kills the background SMS threads and makes ngrok return `502 Bad Gateway`. For simulator testing, start the backend with this instead of step 7:
+```bash
+gunicorn --workers 1 --threads 8 --bind 127.0.0.1:5050 "backend.app:create_app()"
+```
+Then run `ngrok http 5050` and follow the Africa's Talking section below.
 
 ---
 
-## Africa's Talking Sandbox with ngrok
+## Ports and Addresses
 
-To simulate the end-to-end USSD session and SMS delivery flow locally:
+| Where | Web pages | Backend API |
+|---|---|---|
+| On your computer | http://localhost:3000 (started with `python3 -m http.server`) | http://localhost:5050/api (started with `python3 -m backend.app`) |
+| Live server | https://metlink.boldau.tech (served by nginx) | https://metlink.boldau.tech/api (nginx passes it to gunicorn on port 5050) |
 
-1. **Create an Africa's Talking Account**:
-   - Register at [africastalking.com](https://africastalking.com) and navigate to the **Sandbox** dashboard.
-   - Your sandbox username is `sandbox`.
-   - Under **Settings -> API Key**, generate a sandbox API key.
+Port 5050 is used instead of 5000 because port 5000 can be blocked on some systems (for example WSL).
 
-2. **Configure Local Environment**:
-   In your `.env` file, configure the following values:
+The pages choose the API address in `frontend/js/api.js`. On `localhost` or `127.0.0.1` it uses `http://localhost:5050/api`. On any other host it uses `PROD_API_BASE`, which must be set to the deployed address.
+
+---
+
+## Africa's Talking Sandbox
+
+1. Create an account at [africastalking.com](https://africastalking.com) and open the Sandbox. The username is `sandbox`. Under Settings, generate an API key.
+2. Put these in `.env`:
    ```dotenv
    AT_USERNAME=sandbox
-   AT_API_KEY=your_sandbox_api_key_here
+   AT_API_KEY=your_sandbox_api_key
    AT_SENDER_ID=
    SMS_MODE=log_only
-   SMS_SANDBOX_AUTO_DELIVERED=false
-   AT_WEBHOOK_TOKEN=your_secure_random_token_here
+   AT_WEBHOOK_TOKEN=a_long_random_text_you_make_up
    ```
-   - Start with `SMS_MODE=log_only` to verify session logic.
-   - When ready to dispatch simulated SMS messages to the Africa's Talking Web Simulator, set `SMS_MODE=live`.
-   - Setting `SMS_SANDBOX_AUTO_DELIVERED=true` automatically updates sandbox SMS logs to `DELIVERED` status upon dispatch.
+   Start with `SMS_MODE=log_only` to test the USSD flow. Set `SMS_MODE=live` when you want the SMS to reach the simulator. Leave `AT_SENDER_ID` empty.
+3. In the sandbox, create a USSD service code and set the two callbacks (replace the host and token):
+   - USSD callback: `https://YOUR-HOST/api/ussd/callback?token=YOUR_TOKEN`
+   - SMS delivery reports: `https://YOUR-HOST/api/webhooks/sms-delivery?token=YOUR_TOKEN`
 
-3. **Start ngrok Tunnel**:
-   With your Flask backend running on port `5050`, expose it via ngrok:
-   ```bash
-   ngrok http 5050
-   ```
-   Note the assigned HTTPS forwarding URL (e.g. `https://example-subdomain.ngrok-free.app`).
+   For the deployed demo, `YOUR-HOST` is `metlink.boldau.tech`. For local testing, run `ngrok http 5050` and use the ngrok host instead. The callbacks must use `https://`.
+4. Register a test farmer in the admin portal first, using a Rwandan number in `+250` format.
+5. Open the sandbox Launch Simulator, enter that same number, and dial the service code the sandbox gave you.
+6. Check the result in the admin portal, on the Logs page. The SMS tab should show status `SENT` with a provider id starting with `ATXid_`.
 
-4. **Configure Callbacks in Africa's Talking Dashboard**:
-   - **USSD Callback**:
-     Navigate to **USSD -> Service Codes -> Create Channel** (or edit existing channel). Set the callback URL to:
-     ```text
-     https://YOUR-NGROK-DOMAIN/api/ussd/callback?token=YOUR_WEBHOOK_TOKEN
-     ```
-   - **SMS Delivery Reports**:
-     Navigate to **SMS -> SMS Callback URLs -> Delivery Reports**. Set the URL to:
-     ```text
-     https://YOUR-NGROK-DOMAIN/api/webhooks/sms-delivery?token=YOUR_WEBHOOK_TOKEN
-     ```
-     *(Replace `YOUR-NGROK-DOMAIN` with your active ngrok host and `YOUR_WEBHOOK_TOKEN` with the value of `AT_WEBHOOK_TOKEN` from your `.env`).*
+Notes:
 
-5. **Test in the Africa's Talking Web Simulator**:
-   - Open the Africa's Talking **Web Simulator**.
-   - **Farmer Registration Requirement**: Before dialing, the phone number must be registered in the METLINK database (register via the admin portal at `http://localhost:3000/farmers.html`).
-   - Enter that exact Rwandan phone number in `+250` format (e.g. `+250788123456`) into the simulator phone keypad.
-   - Dial your configured USSD service code (e.g. `*384*...#`).
-   - Complete the prompt steps: select language, enter harvest date (`DDMMYYYY`), enter quantity, select ripeness, and confirm.
-   - **SMS Reception**: Sandbox SMS messages appear exclusively in the Africa's Talking Web Simulator message inbox, not on real mobile devices.
-   - **Inspection**: Open the METLINK admin **Logs** page (`http://localhost:3000/logs.html`) under the **SMS Delivery Logs** tab to verify that the message status shows `SENT` with an assigned `ATXid_` provider identifier.
-   - *Production Note*: Real-world USSD shortcodes require formal allocation and binding through a licensed Rwandan telecommunications operator (such as MTN Rwanda or Airtel Rwanda).
+- Sandbox SMS appears only in the simulator of the account that sent it, never on a real phone.
+- The sandbox does not send delivery reports by default, so the status can stay `SENT`. For demos only, you can set `SMS_SANDBOX_AUTO_DELIVERED=true`, which marks sandbox messages as `DELIVERED` when they are sent.
+- A real USSD shortcode needs a licensed Rwandan telecom operator.
+- Anyone who has the callback URL with the token can call your backend. Do not publish it.
 
 ---
 
-## Deploying Online (Replacing ngrok)
+## Deploying on a Server (Ubuntu, nginx, gunicorn, PostgreSQL)
 
-ngrok is intended solely for local development and demonstration. For a production deployment:
+This is how the demo runs. Everything is on one server, so there is no sleeping and no slow first request. It is meant for a course demo and non-commercial use.
 
-1. **Domain & HTTPS**:
-   - Bind a registered domain name (e.g. `api.metlink.rw` and `admin.metlink.rw`) configured with a valid SSL/TLS certificate (Let's Encrypt / Cloudflare).
+Each step says where to run it, what to run, what it does, and what you should see. Run the steps in order. Commands marked "on the server" go in the terminal connected to your server with `ssh`.
 
-2. **Production WSGI Server**:
-   - Do not use the Flask built-in development server (`app.run()`).
-   - Run the Flask application behind a production-grade WSGI server such as **Gunicorn**:
-     ```bash
-     gunicorn -w 4 -b 0.0.0.0:5050 "backend.app:create_app()"
-     ```
-     *(Note: `gunicorn` is not included in `requirements.txt` to keep development lightweight; install it directly in your production server environment via `pip install gunicorn`).*
+### Before you start
 
-3. **Permanent Africa's Talking Callbacks**:
-   - In the live Africa's Talking dashboard, configure production callbacks pointing to your permanent HTTPS domain:
-     - USSD: `https://api.yourdomain.rw/api/ussd/callback?token=YOUR_PRODUCTION_TOKEN`
-     - Delivery Reports: `https://api.yourdomain.rw/api/webhooks/sms-delivery?token=YOUR_PRODUCTION_TOKEN`
+You need:
+- An Ubuntu server with a public IP address. Use a fixed (elastic) IP so the address does not change when the server restarts.
+- Ports 80 and 443 open, in the server firewall and in your cloud firewall or security group.
+- A host name. Either add an **A record** for your domain that points to the server IP, or use a free name made from your IP with dashes, for example `203-0-113-5.sslip.io`.
 
-4. **Production Environment Variables**:
-   - `AT_USERNAME`: Set to your live Africa's Talking account username.
-   - `AT_API_KEY`: Set to your live production API key.
-   - `AT_SENDER_ID`: Set to your approved alphanumeric sender ID or shortcode.
-   - `SMS_MODE`: Set to `live`.
-   - `JWT_SECRET`: Generate a cryptographically secure 256-bit key:
-     ```bash
-     python3 -c "import secrets; print(secrets.token_hex(32))"
-     ```
-   - `DB_USER` / `DB_PASSWORD`: Configure strong dedicated database user credentials.
+In the steps below, replace `YOUR-HOST` with that host name (for example `metlink.boldau.tech`) and `YOUR_EMAIL` with your email.
 
-5. **CORS Configuration**:
-   - In [backend/app.py](file:///home/holi/metlink_project_directory/metlink/backend/app.py#L29), restrict allowed origins from wildcard `*` to your production frontend domains:
-     ```python
-     # Replace:
-     CORS(app, resources={r"/api/*": {"origins": "*"}})
+### Step 1: Install the software (on the server)
 
-     # With:
-     CORS(app, resources={r"/api/*": {"origins": ["https://metlink.rw", "https://admin.metlink.rw"]}})
-     ```
+Run:
+```bash
+sudo apt update
+sudo apt install -y postgresql python3-venv python3-pip git nginx certbot python3-certbot-nginx rsync
+```
+What it does: installs the database, the web server, the certificate tool and the file copy tool.
+You should see: a long list of packages and no error at the end. If it says `Unable to locate package`, run `sudo apt update` again.
 
-6. **Frontend API Base URL**:
-   - In [frontend/js/api.js](file:///home/holi/metlink_project_directory/metlink/frontend/js/api.js#L7), update the API endpoint:
-     ```javascript
-     // Replace:
-     const API_BASE = 'http://localhost:5050/api';
+### Step 2: Copy the project to the server (on your computer)
 
-     // With:
-     const API_BASE = 'https://api.metlink.rw/api';
-     ```
+First open `frontend/js/api.js` and set `PROD_API_BASE` to `https://YOUR-HOST/api`. Do this before copying.
 
-7. **Database Security & Backups**:
-   - Use a managed PostgreSQL instance with automated backups, encryption at rest, and firewall network restrictions.
-   - **Never execute `init_db.sh` in production.** Apply incremental SQL schema migrations instead.
-   - Rotate or remove the default seeded administrator passwords (`Admin@1234` and `Analyst@1234`).
-   - Ensure `.env` is never committed to source control and rotate any credential immediately if compromised.
+Then run, from the folder that contains `metlink`:
+```bash
+rsync -av --exclude .venv --exclude __pycache__ --exclude .env --exclude .git \
+  -e "ssh -i YOUR-KEY" \
+  metlink/ USER@SERVER_IP:~/metlink/
+```
+What it does: copies the project files to `~/metlink` on the server and leaves out your local settings and environment.
+You should see: a list of file names, then `total size is ...`.
+
+### Step 3: Create the Python environment (on the server)
+
+Run:
+```bash
+cd ~/metlink
+python3 --version
+```
+If it shows 3.9 or newer, run:
+```bash
+python3 -m venv .venv
+```
+If it shows an older version (Ubuntu 20.04 has 3.8), run these three lines instead:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+~/.local/bin/uv python install 3.12
+~/.local/bin/uv venv --seed --python 3.12 .venv
+```
+What it does: creates a private Python folder. The `uv` lines first download Python 3.12 without changing the system Python.
+You should see: `Installed Python 3.12...` and then `Creating virtual environment`.
+
+Then install the packages:
+```bash
+.venv/bin/pip install -r requirements.txt
+```
+You should see: `Successfully installed ...` at the end.
+
+### Step 4: Create the database (on the server)
+
+Run, all in the same terminal window:
+```bash
+DBPASS=$(openssl rand -hex 16)
+sudo -u postgres psql -c "CREATE USER metlink WITH PASSWORD '$DBPASS';"
+sudo -u postgres psql -c "CREATE DATABASE metlink OWNER metlink;"
+sudo -u postgres psql -d metlink -c "ALTER SCHEMA public OWNER TO metlink;"
+```
+What it does: makes a random database password, creates the database user and the database, and lets that user manage its own tables.
+You should see: `CREATE ROLE`, `CREATE DATABASE` and `ALTER SCHEMA`.
+Do not close this terminal window until step 5 is done, because step 5 uses the password saved in `DBPASS`.
+
+### Step 5: Create the settings file (on the server)
+
+Run:
+```bash
+cd ~/metlink
+cat > .env <<ENVEOF
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+DATABASE_URL=postgresql://metlink:$DBPASS@localhost:5432/metlink
+CORS_ORIGINS=https://YOUR-HOST
+SMS_MODE=live
+ENVEOF
+chmod 600 .env
+```
+What it does: writes a new `.env` with a random secret key, the database address and the allowed website address, and makes it readable only by you.
+
+Now add your Africa's Talking settings. Type the first line below and press Enter, paste your lines (one `NAME=value` per line, taken from `.env.example`), press Enter, then type `EOF` on its own line:
+```bash
+cat >> .env <<'EOF'
+```
+Check the names without showing the values:
+```bash
+cut -d= -f1 .env
+```
+You should see: `SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS`, `SMS_MODE` and your Africa's Talking names (`AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID`, `AT_WEBHOOK_TOKEN`). Each name should appear only once.
+
+### Step 6: Load the tables and starting data (on the server)
+
+Run:
+```bash
+export DATABASE_URL=$(grep '^DATABASE_URL=' .env | cut -d= -f2-)
+read -s -p "Super admin password: " SEED_SUPER_ADMIN_PASSWORD; export SEED_SUPER_ADMIN_PASSWORD; echo
+read -s -p "Analyst password: " SEED_ANALYST_PASSWORD; export SEED_ANALYST_PASSWORD; echo
+export PATH="$PWD/.venv/bin:$PATH"
+bash database/init_remote.sh --yes
+```
+What it does: asks you for two admin passwords (8 to 72 characters, nothing shows while you type), then creates all tables and loads the starting data with those passwords. Write the passwords down.
+You should see: `Admin credentials configured successfully.` and `Remote database initialization completed successfully.`
+
+If it says the database already has tables, add `--reset` to the last command. That deletes everything in the database and starts again.
+
+### Step 7: Run the backend as a service (on the server)
+
+Run:
+```bash
+APP=$HOME/metlink
+sudo tee /etc/systemd/system/metlink.service > /dev/null <<SVCEOF
+[Unit]
+Description=METLINK backend
+After=network.target postgresql.service
+
+[Service]
+User=$USER
+WorkingDirectory=$APP
+EnvironmentFile=$APP/.env
+ExecStart=$APP/.venv/bin/gunicorn --workers 1 --threads 8 --timeout 30 --bind 127.0.0.1:5050 "backend.app:create_app()"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now metlink
+sleep 4
+curl http://127.0.0.1:5050/api/health
+```
+What it does: creates a service that starts the backend now, restarts it if it stops, and starts it again after a reboot. The last line asks the backend if it is healthy.
+You should see: `Created symlink ...` and then `{"database":"connected","status":"ok"}`.
+If you do not, run `sudo journalctl -u metlink -n 50 --no-pager` to read the error.
+
+### Step 8: Set up the web server and HTTPS (on the server)
+
+Run:
+```bash
+HOST=YOUR-HOST
+APP=$HOME/metlink
+sudo tee /etc/nginx/sites-available/metlink > /dev/null <<'NGXEOF'
+server {
+    listen 80;
+    server_name HOST_HERE;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5050;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        root APP_HERE/frontend;
+        index index.html;
+        try_files $uri $uri/ =404;
+    }
+}
+NGXEOF
+sudo sed -i "s|HOST_HERE|$HOST|; s|APP_HERE|$APP|" /etc/nginx/sites-available/metlink
+chmod o+x "$HOME"
+sudo ln -sf /etc/nginx/sites-available/metlink /etc/nginx/sites-enabled/metlink
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+What it does: tells nginx to show the web pages from the `frontend` folder and to pass every `/api/` request to the backend.
+You should see: `syntax is ok` and `test is successful`.
+
+Then get a free HTTPS certificate:
+```bash
+sudo certbot --nginx -d $HOST -m YOUR_EMAIL --agree-tos --no-eff-email --redirect
+```
+You should see: `Congratulations! You have successfully enabled https://YOUR-HOST`. Certbot renews the certificate by itself.
+
+### Step 9: Point Africa's Talking at your server
+
+In the Africa's Talking sandbox, set both callbacks (see the Africa's Talking section above):
+- USSD callback: `https://YOUR-HOST/api/ussd/callback?token=YOUR_TOKEN`
+- SMS delivery reports: `https://YOUR-HOST/api/webhooks/sms-delivery?token=YOUR_TOKEN`
+
+Test the USSD callback first (on the server or your computer):
+```bash
+curl -X POST "https://YOUR-HOST/api/ussd/callback?token=YOUR_TOKEN" \
+  -d "sessionId=t1" -d "phoneNumber=+250788123456" -d "text="
+```
+What it does: sends the same kind of request that Africa's Talking sends.
+You should see: `CON METLINK`, then `1. English` and `2. Kinyarwanda` for a registered number, or an `END` message for a number that is not registered.
+
+### Step 10: Check everything
+
+1. Open `https://YOUR-HOST`. You should see the landing page with market prices.
+2. Open `https://YOUR-HOST/login.html` and sign in as `aline.uwase` with the super admin password you chose in step 6.
+3. Dial your service code in the sandbox simulator and finish one harvest submission.
+4. In the admin portal, open Logs. You should see the new submission and SMS.
+
+### Updating the server later
+
+On your computer, run the `rsync` command from step 2 again. It copies only changed files. Then, on the server:
+```bash
+sudo systemctl restart metlink
+```
+Keep `PROD_API_BASE` in your local copy the same as the live address, or the next copy will overwrite it.
+
+### Keeping it working until January
+
+- The service starts by itself after a reboot. Reboot the server once after setup (`sudo reboot`) and check that the site comes back.
+- Keep the server IP fixed and ports 80 and 443 open.
+- Check the certificate renewal once: `sudo certbot renew --dry-run`.
+- Once a week, check that the site, `/api/health` and one USSD session work.
+- Read logs with `sudo journalctl -u metlink -n 50 --no-pager` and `sudo tail /var/log/nginx/access.log`. The nginx log shows the webhook token in the URL, so do not share it.
+
+### Other free option: Render and Neon
+
+The same code also runs on a Render free web service (start command `gunicorn --workers 1 --threads 8 --timeout 30 --bind 0.0.0.0:$PORT "backend.app:create_app()"`) with a Neon free database loaded through `database/init_remote.sh`. The free Render backend sleeps after 15 minutes without traffic and the first request can take up to a minute, which can break the first USSD call. Use Neon for the database, because the free Render database expires after 30 days.
 
 ---
 
-## API Endpoints Summary
+## Deploying for Real Use (checklist)
 
-| Method | Endpoint Path | Authentication Required | Required Role | Description |
-|---|---|---|---|---|
-| `GET` | `/api/health` | Public | None | Database connection and service health check |
-| `POST` | `/api/auth/login` | Public | None | Admin authentication returning JWT token and profile |
-| `POST` | `/api/auth/logout` | JWT Required | Any Admin | Terminates session and logs logout action |
-| `GET` | `/api/auth/me` | JWT Required | Any Admin | Returns profile of currently authenticated administrator |
-| `POST` | `/api/auth/change-password` | JWT Required | Any Admin | Changes password of authenticated administrator |
-| `GET` | `/api/dashboard/summary` | JWT Required | Any Admin | High-level KPI metrics, active season, and recent activity |
-| `GET` | `/api/farmers` | JWT Required | Any Admin | List registered farmers with optional search and status filtering |
-| `POST` | `/api/farmers` | JWT Required | Any Admin | Register a new farmer with phone normalization |
-| `PUT` | `/api/farmers/<id>` | JWT Required | Any Admin | Update farmer details or toggle active status |
-| `GET` | `/api/markets` | JWT Required | Any Admin | List all markets with price metrics, demand, and transport |
-| `POST` | `/api/markets` | JWT Required | Any Admin | Add a new market intelligence record |
-| `PUT` | `/api/markets/<id>` | JWT Required | Any Admin | Update market prices, demand rating, or active status |
-| `GET` | `/api/public/markets` | Public | None | Read-only market price summary for public landing page |
-| `GET` | `/api/seasons` | JWT Required | Any Admin | List agricultural season definitions and date ranges |
-| `POST` | `/api/seasons` | JWT Required | Any Admin | Define a new agricultural season window |
-| `PUT` | `/api/seasons/<id>` | JWT Required | Any Admin | Update season date ranges or active evaluation state |
-| `GET` | `/api/rules` | JWT Required | Any Admin | List harvest advisory decision rules ordered by priority |
-| `POST` | `/api/rules` | JWT Required | Any Admin | Create a new prioritized decision rule |
-| `PUT` | `/api/rules/<id>` | JWT Required | Any Admin | Modify rule conditions, advice actions, or active status |
-| `GET` | `/api/submissions` | JWT Required | Any Admin | Retrieve farmer USSD harvest submission history |
-| `GET` | `/api/sms-logs` | JWT Required | Any Admin | Retrieve SMS dispatch logs, provider IDs, and delivery status |
-| `GET` | `/api/audit-logs` | JWT Required | Any Admin | Retrieve chronological record of administrator actions |
-| `GET` | `/api/admins` | JWT Required | `super_admin` only | List system administrators and role assignments |
-| `POST` | `/api/admins` | JWT Required | `super_admin` only | Provision a new administrator account |
-| `PUT` | `/api/admins/<id>` | JWT Required | `super_admin` only | Modify administrator profile, role, or active status |
-| `POST` | `/api/ussd/callback` | Webhook Token (Optional) | None | Handles incoming Africa's Talking USSD session events |
-| `POST` | `/api/webhooks/sms-delivery` | Webhook Token (Optional) | None | Ingests Africa's Talking SMS delivery status callbacks |
+A free demo is not enough for real farmers. For a real deployment:
+
+- Use a server or plan that does not sleep, with database backups.
+- Use a live Africa's Talking account: your live `AT_USERNAME`, your live API key, an approved sender ID, and a USSD shortcode from a Rwandan telecom operator.
+- Point both Africa's Talking callbacks at the permanent HTTPS address, with a strong token.
+- Set a strong `SECRET_KEY`, `COOKIE_SECURE=true`, and `CORS_ORIGINS` to your real frontend address only.
+- Remove the seeded accounts or change their passwords.
+- Never run `init_db.sh` or `database/init_remote.sh --reset` on a database with real data.
+- Never commit `.env`, and rotate any key that was ever shown in public.
+
+---
+
+## API Endpoints
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/health` | Public | Health check |
+| `POST` | `/api/auth/login` | Public | Admin login, returns a token |
+| `POST` | `/api/auth/logout` | Admin | Log out |
+| `GET` | `/api/auth/me` | Admin | Current admin profile |
+| `POST` | `/api/auth/change-password` | Admin | Change own password |
+| `GET` | `/api/dashboard/summary` | Admin | Dashboard numbers, active season, recent activity |
+| `GET` | `/api/farmers` | Admin | List farmers |
+| `POST` | `/api/farmers` | Admin | Register a farmer |
+| `PUT` | `/api/farmers/<id>` | Admin | Edit, activate or deactivate a farmer |
+| `GET` | `/api/markets` | Admin | List markets |
+| `POST` | `/api/markets` | Admin | Add a market |
+| `PUT` | `/api/markets/<id>` | Admin | Edit, activate or deactivate a market |
+| `GET` | `/api/public/markets` | Public | Market prices for the landing page |
+| `GET` | `/api/seasons` | Admin | List seasons |
+| `POST` | `/api/seasons` | Admin | Add a season |
+| `PUT` | `/api/seasons/<id>` | Admin | Edit, activate or deactivate a season |
+| `GET` | `/api/rules` | Admin | List decision rules |
+| `POST` | `/api/rules` | Admin | Create a rule |
+| `PUT` | `/api/rules/<id>` | Admin | Edit, activate or deactivate a rule |
+| `GET` | `/api/submissions` | Admin | Farmer submissions |
+| `GET` | `/api/sms-logs` | Admin | SMS messages and delivery status |
+| `GET` | `/api/audit-logs` | Admin | Admin audit trail |
+| `GET` | `/api/admins` | `super_admin` | List admin accounts |
+| `POST` | `/api/admins` | `super_admin` | Create an admin account |
+| `PUT` | `/api/admins/<id>` | `super_admin` | Edit, activate or deactivate an admin |
+| `POST` | `/api/ussd/callback` | Webhook token | Africa's Talking USSD |
+| `POST` | `/api/webhooks/sms-delivery` | Webhook token | Africa's Talking delivery reports |
+
+Admin endpoints need the header `Authorization: Bearer <token>`. If `AT_WEBHOOK_TOKEN` is set, the two Africa's Talking endpoints need `?token=<value>` in the URL.
 
 ---
 
 ## Running the Tests
 
-The repository includes automated test suites covering core business services, USSD navigation, error resilience, and REST endpoints:
+The tests are plain scripts. Run them from the repository root with the virtual environment active. They print PASS or FAIL for each check and exit with a non-zero code when something fails.
 
-1. **Core Business Services Test Suite**:
-   ```bash
-   .venv/bin/python backend/tests/test_services.py
-   ```
-   - **What it checks**: Phone normalization, input validation, rule matching priority, fallback rule generation, GSM-7 bilingual SMS templating, and Africa's Talking client mocking.
-   - **Prerequisites**: PostgreSQL database running and initialized with seed data.
+| Command | What it checks | Needs |
+|---|---|---|
+| `python backend/tests/test_services.py` | Phone handling, validation, rule matching, storage guard, fallback, SMS text and SMS logging (SMS is mocked) | Initialized database |
+| `python backend/tests/test_ussd_flow.py` | Full USSD sessions, SMS logging, delivery webhook and 10 users at the same time (SMS is mocked) | Initialized database |
+| `python backend/tests/test_ussd_navigation.py` | Back navigation and invalid input at every step | Initialized database |
+| `python backend/tests/test_ussd_fixes.py` | Date entry, one SMS record per submission, and that the callback never hangs | Initialized database |
+| `python tests/test_admin_api.py` | Admin API: login, access control and all admin endpoints | Backend running |
+| `python backend/tests/manual_sms_probe.py` | Sends one real sandbox SMS to check your Africa's Talking keys | Keys in `.env`, `SMS_MODE=live` |
 
-2. **USSD Flow Integration Test Suite**:
-   ```bash
-   .venv/bin/python backend/tests/test_ussd_flow.py
-   ```
-   - **What it checks**: Multi-turn USSD sessions run against the real Flask test client and database, token folding, mock SMS dispatch, and concurrent session isolation. Test farmer records created during the run are automatically cleaned up in foreign-key order.
-   - **Prerequisites**: PostgreSQL database running and initialized.
+The USSD tests create farmers whose names start with `TEST_` and delete them when they finish. Run the tests against a local database, not the deployed one.
 
-3. **USSD Navigation & Step Machine Test Suite**:
-   ```bash
-   .venv/bin/python backend/tests/test_ussd_navigation.py
-   ```
-   - **What it checks**: Pure step machine token folding, zero-lock behavior on invalid tokens, back navigation (`0`), single-step date entry (`DDMMYYYY`), and confirmation screen transitions.
-   - **Prerequisites**: PostgreSQL database running and initialized.
+Administrators keep the system accurate from the portal:
 
-4. **USSD Fixes & Simulator Never-Hang Test Suite**:
-   ```bash
-   .venv/bin/python backend/tests/test_ussd_fixes.py
-   ```
-   - **What it checks**: Validates that single-step date entry works cleanly, every SMS generates a complete record in `sms_logs`, and session handlers never hang the Africa's Talking simulator.
-   - **Prerequisites**: PostgreSQL database running and initialized.
-
-5. **Admin REST API Verification**:
-   ```bash
-   .venv/bin/python tests/test_admin_api.py
-   ```
-   - **What it checks**: Verifies unauthenticated 401 blocking, admin authentication, token validation, CRUD operations across all administrative entities, and public market endpoints.
-   - **Prerequisites**: Backend server running on `http://localhost:5000` (or `http://localhost:5050`) with database initialized.
-
-6. **Manual SMS Gateway Diagnostic Probe**:
-   ```bash
-   .venv/bin/python backend/tests/manual_sms_probe.py
-   ```
-   - **What it checks**: Performs an ad-hoc test dispatch through the Africa's Talking API to verify account credentials and sandbox connectivity.
-
-### Admin Dashboard Maintenance Workflows
-Administrators manage system intelligence directly from the dashboard:
-- **Decision Rules**: Navigate to [rules.html](http://localhost:3000/rules.html) to adjust rule priority rankings, quantity bounds, target maturity stages, and storage advice. Rules with lower priority numbers are evaluated first.
-- **Agricultural Seasons**: Navigate to [seasons.html](http://localhost:3000/seasons.html) to configure calendar date windows for Season A, B, and C. Only one active season applies to incoming harvest evaluations.
-- **Market Prices**: Navigate to [markets.html](http://localhost:3000/markets.html) to update daily wholesale and retail pricing benchmarks, buyer demand levels, and transport cost estimates across Kigali and Kamonyi markets.
+- **Rules:** change priorities, quantity limits, maturity, price trend and demand conditions. Lower numbers run first.
+- **Seasons:** set the date windows and which season is active.
+- **Markets:** update prices, demand levels and sources. Use only prices that come from a trusted source or were checked.
 
 ---
 
 ## Troubleshooting
 
-- **Backend Does Not Start (`psycopg.OperationalError: Connection refused`)**:
-  - Verify PostgreSQL is running: `sudo systemctl status postgresql`.
-  - Check that `.env` contains valid credentials and matches `DB_PORT=5432` and `DB_NAME=metlink_db`.
-  - Confirm database initialization was executed: `./init_db.sh`.
-
-- **Webhook Token Mismatch (`HTTP 401 / 403` on USSD Callback)**:
-  - If `AT_WEBHOOK_TOKEN` is set in `.env`, the callback URL in Africa's Talking must include the exact query string `?token=YOUR_TOKEN`.
-  - If no token validation is desired during initial local testing, leave `AT_WEBHOOK_TOKEN=` empty in `.env`.
-
-- **ngrok Returns `HTTP 502 Bad Gateway`**:
-  - Verify the Flask backend is actively running on the exact port forwarded by ngrok (default port: `5050`).
-  - Ensure the backend was started with `--no-reload` so background SMS threads do not trigger reloader restarts.
-
-- **SMS Status Remains `SENT` Instead of `DELIVERED`**:
-  - The Africa's Talking sandbox does not emit real telecom delivery receipts unless the delivery callback is triggered or `SMS_SANDBOX_AUTO_DELIVERED=true` is enabled in `.env`.
-  - Verify that your delivery callback URL is configured in the Africa's Talking dashboard under **SMS -> Delivery Reports**.
-
-- **Farmer Sees "Not Registered" on USSD**:
-  - The phone number dialing the USSD code must exist in the `farmers` database table.
-  - Register the farmer via the admin portal ([farmers.html](http://localhost:3000/farmers.html)) using the international `+250` format.
+- **The backend does not start:** check that PostgreSQL is running and that `.env` has the correct database settings. Run `./init_db.sh` if the local database does not exist yet. On a server, run `sudo journalctl -u metlink -n 50 --no-pager`.
+- **Every submission gets "No specific decision rule matched":** the rules do not fit the input. Remember that the price trend is always STABLE and that the demand level comes from the highest-priced market. Edit or add rules on the Rules page.
+- **The USSD callback returns 403:** the `token` in the callback URL must match `AT_WEBHOOK_TOKEN` exactly. Restart the backend after you change `.env`.
+- **The simulator shows a network error:** test the callback with curl first. Then check the nginx log with `sudo grep ussd /var/log/nginx/access.log | tail`. If no request from Africa's Talking appears, the callback URL is not saved on that service code, or it does not start with `https://`.
+- **ngrok shows 502:** the backend is not running on the port ngrok forwards to, or it was restarted by the reloader. Start the backend with the `gunicorn` command from the "Testing Africa's Talking from your computer" part of the local setup.
+- **ngrok shows `ERR_NGROK_3200`:** ngrok is not running. Start it again.
+- **The SMS status stays `SENT`:** the sandbox sends no delivery report by default. This is normal.
+- **The simulator says the number is not registered:** register that exact `+250` number as a farmer in the admin portal first.
+- **`pip` cannot find Flask 3.1:** the Python on the server is too old. Use Python 3.12 (see the server steps).
+- **`init_remote.sh` says `No module named 'bcrypt'`:** put the virtual environment on the path first: `export PATH="$PWD/.venv/bin:$PATH"`.
+- **`init_remote.sh --reset` says `must be owner of schema public`:** run `sudo -u postgres psql -d metlink -c "ALTER SCHEMA public OWNER TO metlink;"`.
+- **`rsync` says `command not found`:** install rsync on the server too (`sudo apt install -y rsync`).
+- **The admin portal cannot reach the backend after deploying:** check `PROD_API_BASE` in `frontend/js/api.js` and `CORS_ORIGINS` in `.env`, then restart the backend.
 
 ---
 
-## License & Credits
+## License and Credits
 
 - **License**: **The "Please Just Give Me an A" License (PJGMA-1.0)**
 Copyright (c) 2026
