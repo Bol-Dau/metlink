@@ -4,7 +4,15 @@
  * and standard HTTP error handling.
  */
 
-const API_BASE = 'http://localhost:5050/api';
+const PROD_API_BASE = 'https://metlink.boldau.tech/api';
+const _hostname = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : '';
+const API_BASE = (!_hostname || _hostname === 'localhost' || _hostname === '127.0.0.1')
+  ? 'http://localhost:5050/api'
+  : PROD_API_BASE;
+
+if (typeof window !== 'undefined') {
+  window.API_BASE = API_BASE;
+}
 
 const MetlinkAPI = {
   baseUrl: API_BASE,
